@@ -1,0 +1,15 @@
+[package]
+name = "moonshine-behavior"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bevy_app = "0.10.*"
+bevy_ecs = "0.10.*"
+bevy_reflect = "0.10.*"
+bevy_utils = "0.10.*"
+
+[dev-dependencies]
+bevy = "0.10.1"
