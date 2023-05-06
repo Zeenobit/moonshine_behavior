@@ -188,6 +188,10 @@ impl<B: Behavior> BehaviorMutItem<'_, '_, B> {
         &self.behavior
     }
 
+    pub fn get_mut(&mut self) -> &mut B {
+        &mut self.behavior
+    }
+
     /// Tries to start the given [`Behavior`] as the next one.
     ///
     /// This only sets the behavior [`Transition`], and does not immediately modify the behavior.
