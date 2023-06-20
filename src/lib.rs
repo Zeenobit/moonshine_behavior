@@ -309,6 +309,18 @@ impl<B: Behavior> Transition<B> {
     }
 }
 
+pub fn next<B: Behavior>(next: B) -> Transition<B> {
+    Next(next)
+}
+
+pub fn previous<B: Behavior>() -> Transition<B> {
+    Previous
+}
+
+pub fn reset<B: Behavior>() -> Transition<B> {
+    Reset
+}
+
 #[doc(hidden)]
 #[derive(SystemParam)]
 pub struct Events<'w, B: Behavior> {
@@ -438,15 +450,15 @@ pub fn transition<B: Behavior>(
 ) {
     for (entity, current, memory, mut transition) in &mut query {
         match transition.bypass_change_detection().take() {
-            Next(next) => push(entity, next, current, memory, &mut events),
-            Previous => pop(entity, current, memory, &mut events),
-            Reset => reset(entity, current, memory, &mut events),
+            Next(next) => transition_next(entity, next, current, memory, &mut events),
+            Previous => transition_previous(entity, current, memory, &mut events),
+            Reset => transition_reset(entity, current, memory, &mut events),
             _ => (),
         }
     }
 }
 
-fn push<B: Behavior>(
+fn transition_next<B: Behavior>(
     entity: Entity,
     mut next: B,
     mut current: Mut<B>,
@@ -471,7 +483,7 @@ fn push<B: Behavior>(
     }
 }
 
-fn pop<B: Behavior>(
+fn transition_previous<B: Behavior>(
     entity: Entity,
     mut current: Mut<B>,
     mut memory: Mut<Memory<B>>,
@@ -490,7 +502,7 @@ fn pop<B: Behavior>(
     }
 }
 
-fn reset<B: Behavior>(
+fn transition_reset<B: Behavior>(
     entity: Entity,
     mut current: Mut<B>,
     mut memory: Mut<Memory<B>>,
