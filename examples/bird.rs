@@ -19,19 +19,22 @@ fn main() {
         }))
         // Add the BehaviorPlugin for Bird behavior.
         // This plugin is required for the behavior system to work with a behavior type.
-        .add_plugin(BehaviorPlugin::<Bird>::default())
+        .add_plugins(BehaviorPlugin::<Bird>::default())
         // Add the transition system for Bird behavior
         // Behavior changes happen in this system. Register your systems before or after it as needed.
-        .add_system(transition::<Bird>)
+        .add_systems(Update, transition::<Bird>)
         // ... other systems ...
-        .add_startup_system(setup)
-        .add_systems((update_text, update_buttons).after(transition::<Bird>))
-        .add_system(on_button_clicked.before(transition::<Bird>))
+        .add_systems(Startup, setup)
+        .add_systems(
+            Update,
+            (update_text, update_buttons).after(transition::<Bird>),
+        )
+        .add_systems(Update, on_button_clicked.before(transition::<Bird>))
         .run();
 }
 
 // Define Bird behavior as an enum with all of its possible states.
-#[derive(Component, Default, Debug, Reflect, FromReflect)]
+#[derive(Component, Default, Debug, Reflect)]
 #[reflect(Component)]
 enum Bird {
     #[default]
@@ -77,7 +80,8 @@ fn setup(asset_server: Res<AssetServer>, mut commands: Commands) {
     commands
         .spawn(NodeBundle {
             style: Style {
-                size: Size::all(Val::Percent(100.)),
+                width: Val::Percent(100.),
+                height: Val::Percent(100.),
                 flex_direction: FlexDirection::Column,
                 align_items: AlignItems::Start,
                 padding: UiRect::all(Val::Px(20.)),
@@ -118,7 +122,8 @@ fn setup(asset_server: Res<AssetServer>, mut commands: Commands) {
             ));
             root.spawn(NodeBundle {
                 style: Style {
-                    size: Size::width(Val::Percent(100.)),
+                    width: Val::Percent(100.),
+                    height: Val::Percent(100.),
                     flex_direction: FlexDirection::Row,
                     align_items: AlignItems::Start,
                     ..default()
@@ -190,7 +195,7 @@ fn on_button_clicked(
     use Bird::*;
     let mut behavior = bird.single_mut();
     for (action, interaction) in query.iter() {
-        if let Interaction::Clicked = interaction {
+        if let Interaction::Pressed = interaction {
             match action {
                 Action::Fly => behavior.try_start(Fly),
                 Action::Sleep => behavior.try_start(Sleep),

@@ -7,7 +7,7 @@ use std::{
 
 use bevy_app::{App, Plugin};
 use bevy_ecs::{prelude::*, query::WorldQuery, system::SystemParam};
-use bevy_reflect::{FromReflect, Reflect};
+use bevy_reflect::{FromReflect, Reflect, TypePath};
 use bevy_utils::tracing::{debug, error, warn};
 
 pub mod prelude {
@@ -30,7 +30,7 @@ impl<B: Behavior> Default for BehaviorPlugin<B> {
     }
 }
 
-impl<B: Behavior + FromReflect> Plugin for BehaviorPlugin<B> {
+impl<B: Behavior + FromReflect + TypePath> Plugin for BehaviorPlugin<B> {
     fn build(&self, app: &mut App) {
         app.add_event::<StartedEvent<B>>()
             .add_event::<PausedEvent<B>>()
@@ -337,6 +337,7 @@ impl<'w, B: Behavior> Events<'w, B> {
 }
 
 /// An event emitted when a [`Behavior`] is started.
+#[derive(Event)]
 pub struct StartedEvent<B: Behavior> {
     entity: Entity,
     marker: PhantomData<B>,
@@ -357,6 +358,7 @@ impl<B: Behavior> StartedEvent<B> {
 }
 
 /// An event emitted when a [`Behavior`] is resumed.
+#[derive(Event)]
 pub struct ResumedEvent<B: Behavior> {
     entity: Entity,
     marker: PhantomData<B>,
@@ -377,6 +379,7 @@ impl<B: Behavior> ResumedEvent<B> {
 }
 
 /// An event emitted when a [`Behavior`] is paused.
+#[derive(Event)]
 pub struct PausedEvent<B: Behavior> {
     entity: Entity,
     marker: PhantomData<B>,
@@ -397,6 +400,7 @@ impl<B: Behavior> PausedEvent<B> {
 }
 
 /// An event emitted when a [`Behavior`] is stopped.
+#[derive(Event)]
 pub struct StoppedEvent<B: Behavior> {
     entity: Entity,
     behavior: B,

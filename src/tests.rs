@@ -2,7 +2,7 @@ use bevy::prelude::*;
 
 use crate::{transition, Behavior, BehaviorBundle, BehaviorPlugin, Next, Previous, Reset};
 
-#[derive(Component, Default, Debug, PartialEq, Eq, Reflect, FromReflect)]
+#[derive(Component, Default, Debug, PartialEq, Eq, Reflect)]
 enum B {
     #[default]
     S0,
@@ -16,9 +16,8 @@ impl Behavior for B {}
 
 fn app() -> App {
     let mut app = App::new();
-    app.add_plugins(MinimalPlugins)
-        .add_plugin(BehaviorPlugin::<B>::default())
-        .add_system(transition::<B>);
+    app.add_plugins((MinimalPlugins, BehaviorPlugin::<B>::default()))
+        .add_systems(Update, transition::<B>);
     app
 }
 
