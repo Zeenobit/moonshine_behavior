@@ -127,6 +127,12 @@ impl<B: Behavior> BehaviorBundle<B> {
             transition: Transition::default(),
         }
     }
+
+    /// Tries to start the given [`Behavior`] as the next one immediately after insertion.
+    pub fn try_start(mut self, next: B) -> Self {
+        self.transition = Next(next);
+        self
+    }
 }
 
 /// A [`WorldQuery`] used to query a [`Behavior`].
