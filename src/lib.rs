@@ -137,12 +137,12 @@ impl<B: Behavior> BehaviorBundle<B> {
 
 /// A [`WorldQuery`] used to query a [`Behavior`].
 #[derive(WorldQuery)]
-pub struct BehaviorRef<'a, B: Behavior> {
-    behavior: &'a B,
-    memory: &'a Memory<B>,
+pub struct BehaviorRef<B: Behavior> {
+    behavior: &'static B,
+    memory: &'static Memory<B>,
 }
 
-impl<B: Behavior> BehaviorRefItem<'_, '_, B> {
+impl<B: Behavior> BehaviorRefItem<'_, B> {
     pub fn get(&self) -> &B {
         self.behavior
     }
@@ -152,7 +152,7 @@ impl<B: Behavior> BehaviorRefItem<'_, '_, B> {
     }
 }
 
-impl<B: Behavior> Deref for BehaviorRefItem<'_, '_, B> {
+impl<B: Behavior> Deref for BehaviorRefItem<'_, B> {
     type Target = B;
 
     fn deref(&self) -> &Self::Target {
@@ -163,13 +163,13 @@ impl<B: Behavior> Deref for BehaviorRefItem<'_, '_, B> {
 /// A mutable [`WorldQuery`] used to query and manipulate a [`Behavior`].
 #[derive(WorldQuery)]
 #[world_query(mutable)]
-pub struct BehaviorMut<'a, B: Behavior> {
-    behavior: &'a mut B,
-    memory: &'a Memory<B>,
-    transition: &'a mut Transition<B>,
+pub struct BehaviorMut<B: Behavior> {
+    behavior: &'static mut B,
+    memory: &'static Memory<B>,
+    transition: &'static mut Transition<B>,
 }
 
-impl<B: Behavior> BehaviorMutReadOnlyItem<'_, '_, B> {
+impl<B: Behavior> BehaviorMutReadOnlyItem<'_, B> {
     /// Returns a reference to the current [`Behavior`].
     pub fn get(&self) -> &B {
         self.behavior
@@ -181,7 +181,7 @@ impl<B: Behavior> BehaviorMutReadOnlyItem<'_, '_, B> {
     }
 }
 
-impl<B: Behavior> Deref for BehaviorMutReadOnlyItem<'_, '_, B> {
+impl<B: Behavior> Deref for BehaviorMutReadOnlyItem<'_, B> {
     type Target = B;
 
     fn deref(&self) -> &Self::Target {
@@ -189,7 +189,7 @@ impl<B: Behavior> Deref for BehaviorMutReadOnlyItem<'_, '_, B> {
     }
 }
 
-impl<B: Behavior> BehaviorMutItem<'_, '_, B> {
+impl<B: Behavior> BehaviorMutItem<'_, B> {
     pub fn get(&self) -> &B {
         &self.behavior
     }
@@ -248,7 +248,7 @@ impl<B: Behavior> BehaviorMutItem<'_, '_, B> {
     }
 }
 
-impl<B: Behavior> Deref for BehaviorMutItem<'_, '_, B> {
+impl<B: Behavior> Deref for BehaviorMutItem<'_, B> {
     type Target = B;
 
     fn deref(&self) -> &Self::Target {
@@ -256,7 +256,7 @@ impl<B: Behavior> Deref for BehaviorMutItem<'_, '_, B> {
     }
 }
 
-impl<B: Behavior> DerefMut for BehaviorMutItem<'_, '_, B> {
+impl<B: Behavior> DerefMut for BehaviorMutItem<'_, B> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.behavior.as_mut()
     }
