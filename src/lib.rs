@@ -13,7 +13,7 @@ use bevy_utils::tracing::{debug, error, warn};
 pub mod prelude {
     pub use crate::{
         transition, BehaviorPlugin, {Behavior, BehaviorBundle}, {BehaviorMut, BehaviorRef},
-        {PausedBehaviors, ResumedBehaviors, StartedBehaviors, StoppedBehaviors},
+        {Paused, Resumed, Started, Stopped},
         {PausedEvent, ResumedEvent, StartedEvent, StoppedEvent},
     };
 }
@@ -429,16 +429,16 @@ impl<B: Behavior> StoppedEvent<B> {
 }
 
 /// An [`EventReader`] for [`StartedEvent`]s.
-pub type StartedBehaviors<'w, 's, B> = EventReader<'w, 's, StartedEvent<B>>;
+pub type Started<'w, 's, B> = EventReader<'w, 's, StartedEvent<B>>;
 
 /// An [`EventReader`] for [`ResumedEvent`]s.
-pub type ResumedBehaviors<'w, 's, B> = EventReader<'w, 's, ResumedEvent<B>>;
+pub type Resumed<'w, 's, B> = EventReader<'w, 's, ResumedEvent<B>>;
 
 /// An [`EventReader`] for [`PausedEvent`]s.
-pub type PausedBehaviors<'w, 's, B> = EventReader<'w, 's, PausedEvent<B>>;
+pub type Paused<'w, 's, B> = EventReader<'w, 's, PausedEvent<B>>;
 
 /// An [`EventReader`] for [`StoppedEvent`]s.
-pub type StoppedBehaviors<'w, 's, B> = EventReader<'w, 's, StoppedEvent<B>>;
+pub type Stopped<'w, 's, B> = EventReader<'w, 's, StoppedEvent<B>>;
 
 /// A [`System`] which triggers [`Behavior`] transitions.
 #[allow(clippy::type_complexity)]
