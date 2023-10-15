@@ -526,8 +526,12 @@ fn reset<B: Behavior>(
 
     if let Some(mut next) = memory.pop() {
         debug!("{entity:?}: {:?} -> {next:?}", *current);
-        swap(current.as_mut(), &mut next);
+        let behavior = {
+            swap(current.as_mut(), &mut next);
+            next
+        };
         events.resumed(entity);
+        events.stopped(entity, behavior);
     } else {
         warn!("{entity:?}: {:?} -> {:?} is redundant", *current, *current);
     }
