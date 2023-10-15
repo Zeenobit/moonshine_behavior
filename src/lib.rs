@@ -140,11 +140,16 @@ impl<B: Behavior> BehaviorBundle<B> {
 pub struct BehaviorRef<B: Behavior> {
     behavior: &'static B,
     memory: &'static Memory<B>,
+    transition: &'static Transition<B>,
 }
 
 impl<B: Behavior> BehaviorRefItem<'_, B> {
     pub fn get(&self) -> &B {
         self.behavior
+    }
+
+    pub fn has_transition(&self) -> bool {
+        !matches!(self.transition, Transition::Empty)
     }
 
     pub fn previous(&self) -> Option<&B> {
@@ -175,6 +180,10 @@ impl<B: Behavior> BehaviorMutReadOnlyItem<'_, B> {
         self.behavior
     }
 
+    pub fn has_transition(&self) -> bool {
+        !matches!(self.transition, Transition::Empty)
+    }
+
     /// Returns a reference to the previous [`Behavior`], if it exists.
     pub fn previous(&self) -> Option<&B> {
         self.memory.previous()
@@ -196,6 +205,10 @@ impl<B: Behavior> BehaviorMutItem<'_, B> {
 
     pub fn get_mut(&mut self) -> &mut B {
         &mut self.behavior
+    }
+
+    pub fn has_transition(&self) -> bool {
+        !matches!(*self.transition, Transition::Empty)
     }
 
     /// Tries to start the given [`Behavior`] as the next one.
