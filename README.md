@@ -53,7 +53,7 @@ In this example:
   - a bird may chirp when flying
   - a bird may not fly or chirp when sleeping
 
-#### 3. Register the `Behavior` its ransition
+#### 3. Register the `Behavior` and its transition:
 Add a `BehaviorPlugin<T>` to your `App` to register the behavior events and types.
 Use `transition()` system to trigger behavior transitions whenever you want.
 ```rust
