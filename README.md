@@ -52,8 +52,16 @@ In this example:
   - a bird may sleep, fly, or chirp when idle
   - a bird may chirp when flying
   - a bird may not fly or chirp when sleeping
+
+#### 3. Register the `Behavior` its ransition
+Add a `BehaviorPlugin<T>` to your `App` to register the behavior events and types.
+Use `transition()` system to trigger behavior transitions whenever you want.
+```rust
+app.add_plugins(BehaviorPlugin::<Bird>::default())
+    .add_systems(Update, transition::<Bird>);
+```
   
-#### 3. Spawn a `BehaviorBundle`:
+#### 4. Spawn a `BehaviorBundle`:
 For behavior system to work, you must insert your behavior using a `BehaviorBundle`.
 This bundle also inserts an instance of your behavior. This is referred to as the initial behavior.
 ```rust
@@ -115,7 +123,7 @@ Each event (except `StoppedEvent`) carries only the entity ID for which the beha
 For `StartedEvent` and `ResumedEvent`, the behavior exists on the entity itself.
 You may access it either using a normal query (e.g. `Query<&Bird>`), or using `BehaviorRef`.
 ```rust
-fn on_chirp_started(mut events: StartedBehaviors<Bird>, query: Query<BehaviorRef<Bird>>) {
+fn on_chirp_started(mut events: Started<Bird>, query: Query<BehaviorRef<Bird>>) {
     for event in events.iter() {
         let entity = event.entity();
         let behavior = query.get(entity).unwrap();
@@ -125,7 +133,7 @@ fn on_chirp_started(mut events: StartedBehaviors<Bird>, query: Query<BehaviorRef
   }
 }
 
-fn on_chirp_resumed(mut events: ResumedBehaviors<Bird>, query: Query<BehaviorRef<Bird>>) {
+fn on_chirp_resumed(mut events: Resumed<Bird>, query: Query<BehaviorRef<Bird>>) {
     for event in events.iter() {
         let entity = event.entity();
         let behavior = query.get(entity).unwrap();
@@ -137,7 +145,7 @@ fn on_chirp_resumed(mut events: ResumedBehaviors<Bird>, query: Query<BehaviorRef
 ```
 For `PausedEvent`, the paused behavior is the previous behavior on the data, which is accessible using `.previous()`:
 ```rust
-fn on_chirp_paused(mut events: PausedBehaviors<Bird>, query: Query<BehaviorRef<Bird>>) {
+fn on_chirp_paused(mut events: Paused<Bird>, query: Query<BehaviorRef<Bird>>) {
     for event in events.iter() {
         let entity = event.entity();
         let behavior = query.get(entity).unwrap();
@@ -149,7 +157,7 @@ fn on_chirp_paused(mut events: PausedBehaviors<Bird>, query: Query<BehaviorRef<B
 ```
 For `StoppedEvent`, the stopped behavior is accessible through the event itself:
 ```rust
-fn on_chirp_stopped(mut events: StoppedBehaviors<Bird>) {
+fn on_chirp_stopped(mut events: Stopped<Bird>) {
     for event in events.iter() {
         let entity = event.entity();
         let behavior = event.behavior();
