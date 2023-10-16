@@ -60,6 +60,9 @@ Use `transition()` system to trigger behavior transitions whenever you want.
 app.add_plugins(BehaviorPlugin::<Bird>::default())
     .add_systems(Update, transition::<Bird>);
 ```
+
+You can define your systems before or after the `transition` system.
+Usually, systems that cause behavior change should run before transition while systems that handle behavior logic should run after transition.
   
 #### 4. Spawn a `BehaviorBundle`:
 For behavior system to work, you must insert your behavior using a `BehaviorBundle`.
