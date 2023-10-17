@@ -338,19 +338,19 @@ pub struct Events<'w, B: Behavior> {
 }
 
 impl<'w, B: Behavior> Events<'w, B> {
-    pub fn started(&mut self, entity: Entity) {
+    fn send_started(&mut self, entity: Entity) {
         self.started.send(StartedEvent::new(entity));
     }
 
-    pub fn resumed(&mut self, entity: Entity) {
+    fn send_resumed(&mut self, entity: Entity) {
         self.resumed.send(ResumedEvent::new(entity));
     }
 
-    pub fn paused(&mut self, entity: Entity) {
+    fn send_paused(&mut self, entity: Entity) {
         self.paused.send(PausedEvent::new(entity));
     }
 
-    pub fn stopped(&mut self, entity: Entity, behavior: B) {
+    fn send_stopped(&mut self, entity: Entity, behavior: B) {
         self.stopped.send(StoppedEvent::new(entity, behavior));
     }
 }
@@ -483,12 +483,12 @@ fn push<B: Behavior>(
             next
         };
         if behavior.is_resumable() {
-            events.paused(entity);
+            events.send_paused(entity);
             memory.push(behavior);
         } else {
-            events.stopped(entity, behavior);
+            events.send_stopped(entity, behavior);
         }
-        events.started(entity);
+        events.send_started(entity);
     } else {
         warn!("{entity:?}: {:?} -> {next:?} is not allowed", *current);
     }
@@ -506,8 +506,8 @@ fn pop<B: Behavior>(
             swap(current.as_mut(), &mut next);
             next
         };
-        events.resumed(entity);
-        events.stopped(entity, behavior);
+        events.send_resumed(entity);
+        events.send_stopped(entity, behavior);
     } else {
         error!("{entity:?}: {:?} -> None is not allowed", *current);
     }
@@ -521,7 +521,7 @@ fn reset<B: Behavior>(
 ) {
     while memory.len() > 1 {
         let behavior = memory.pop().unwrap();
-        events.stopped(entity, behavior);
+        events.send_stopped(entity, behavior);
     }
 
     if let Some(mut next) = memory.pop() {
@@ -530,8 +530,8 @@ fn reset<B: Behavior>(
             swap(current.as_mut(), &mut next);
             next
         };
-        events.resumed(entity);
-        events.stopped(entity, behavior);
+        events.send_resumed(entity);
+        events.send_stopped(entity, behavior);
     } else {
         warn!("{entity:?}: {:?} -> {:?} is redundant", *current, *current);
     }
