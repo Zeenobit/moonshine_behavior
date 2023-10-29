@@ -1,4 +1,5 @@
 use std::{
+    borrow::{Borrow, BorrowMut},
     fmt::Debug,
     marker::PhantomData,
     mem::{replace, swap},
@@ -165,6 +166,12 @@ impl<B: Behavior> Deref for BehaviorRefItem<'_, B> {
     }
 }
 
+impl<B: Behavior> Borrow<B> for BehaviorRefItem<'_, B> {
+    fn borrow(&self) -> &B {
+        self.behavior
+    }
+}
+
 /// A mutable [`WorldQuery`] used to query and manipulate a [`Behavior`].
 #[derive(WorldQuery)]
 #[world_query(mutable)]
@@ -194,6 +201,12 @@ impl<B: Behavior> Deref for BehaviorMutReadOnlyItem<'_, B> {
     type Target = B;
 
     fn deref(&self) -> &Self::Target {
+        self.behavior
+    }
+}
+
+impl<B: Behavior> Borrow<B> for BehaviorMutReadOnlyItem<'_, B> {
+    fn borrow(&self) -> &B {
         self.behavior
     }
 }
@@ -271,6 +284,18 @@ impl<B: Behavior> Deref for BehaviorMutItem<'_, B> {
 
 impl<B: Behavior> DerefMut for BehaviorMutItem<'_, B> {
     fn deref_mut(&mut self) -> &mut Self::Target {
+        self.behavior.as_mut()
+    }
+}
+
+impl<B: Behavior> Borrow<B> for BehaviorMutItem<'_, B> {
+    fn borrow(&self) -> &B {
+        self.behavior.as_ref()
+    }
+}
+
+impl<B: Behavior> BorrowMut<B> for BehaviorMutItem<'_, B> {
+    fn borrow_mut(&mut self) -> &mut B {
         self.behavior.as_mut()
     }
 }
