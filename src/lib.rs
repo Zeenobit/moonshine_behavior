@@ -136,6 +136,12 @@ impl<B: Behavior> BehaviorBundle<B> {
     }
 }
 
+impl<B: Behavior> From<B> for BehaviorBundle<B> {
+    fn from(behavior: B) -> Self {
+        Self::new(behavior)
+    }
+}
+
 /// A [`WorldQuery`] used to query a [`Behavior`].
 #[derive(WorldQuery)]
 pub struct BehaviorRef<B: Behavior> {
