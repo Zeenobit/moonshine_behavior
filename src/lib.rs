@@ -53,7 +53,7 @@ impl<B: Behavior + FromReflect + TypePath> Plugin for BehaviorPlugin<B> {
 /// use bevy::prelude::*;
 /// use moonshine_behavior::prelude::*;
 ///
-/// #[derive(Component, Default, Debug, Reflect, FromReflect)]
+/// #[derive(Component, Default, Debug, Reflect)]
 /// #[reflect(Component)]
 /// enum Bird {
 ///     #[default]
