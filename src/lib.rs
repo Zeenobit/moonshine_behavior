@@ -7,7 +7,7 @@ use std::{
 };
 
 use bevy_app::{App, Plugin};
-use bevy_ecs::{prelude::*, query::WorldQuery, system::SystemParam};
+use bevy_ecs::{prelude::*, query::QueryData, system::SystemParam};
 use bevy_reflect::{FromReflect, Reflect, TypePath};
 use bevy_utils::tracing::{debug, error, warn};
 
@@ -142,8 +142,8 @@ impl<B: Behavior> From<B> for BehaviorBundle<B> {
     }
 }
 
-/// A [`WorldQuery`] used to query a [`Behavior`].
-#[derive(WorldQuery)]
+/// A [`QueryData`] used to query a [`Behavior`].
+#[derive(QueryData)]
 pub struct BehaviorRef<B: Behavior> {
     behavior: &'static B,
     memory: &'static Memory<B>,
@@ -178,9 +178,9 @@ impl<B: Behavior> Borrow<B> for BehaviorRefItem<'_, B> {
     }
 }
 
-/// A mutable [`WorldQuery`] used to query and manipulate a [`Behavior`].
-#[derive(WorldQuery)]
-#[world_query(mutable)]
+/// A mutable [`QueryData`] used to query and manipulate a [`Behavior`].
+#[derive(QueryData)]
+#[query_data(mutable)]
 pub struct BehaviorMut<B: Behavior> {
     behavior: &'static mut B,
     memory: &'static Memory<B>,
