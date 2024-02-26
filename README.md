@@ -3,10 +3,10 @@ Minimalistic state machine for [Bevy](https://github.com/bevyengine/bevy) game e
 
 ## Overview
 
-This crates is designed to provide a simple, stack-based, lightweight implementation of state machines for Bevy entities.
+This crates is designed to provide a simple, stack-based implementation of state machines for Bevy entities.
 
 ### Features
-- Simple. Minimal overhead for defining and setting up behaviors.
+- Simple: Minimal overhead for defining and setting up behaviors.
 - Behaviors can be started, paused, resumed, and stopped.
 - Event driven API which allows systems to react to behavior changes on entities.
 - Multiple behaviors with different types may exist on the same entity to define complex state machines.
@@ -18,7 +18,7 @@ When the next behavior is started, the current one is pushed onto the stack (if 
 
 ### Setup
 
-#### 1. Define your behavior data as an `enum`:
+#### 1. Define your behavior data as a [`Component`](https://docs.rs/bevy/latest/bevy/ecs/component/trait.Component.html)
 ```rust
 use bevy::prelude::*;
 use moonshine_behavior::prelude::*;
@@ -31,6 +31,48 @@ enum Bird {
     Fly,
     Sleep,
     Chirp,
+}
+```
+
+Behaviors are often implemented as an `enum` since they represent a finite set of states. This is not a hard requirement. Any `struct` may be used to represent behavior data as well, such as:
+```rust
+#[derive(Component, Default, Debug, Reflect, FromReflect)]
+#[reflect(Component)]
+struct Bird {
+    flying: bool,
+    sleeping: bool,
+    chirping: bool,
+}
+```
+
+You may even use nested enums or structs to represent complex state machines:
+```rust
+#[derive(Component, Default, Debug, Reflect, FromReflect)]
+#[reflect(Component)]
+enum Bird {
+    #[default]
+    Idle,
+    Fly(Fly),
+    Sleep(Sleep),
+    Chirp(Chirp),
+}
+
+#[derive(Default, Debug, Reflect)]
+enum Fly {
+    #[default]
+    Normal,
+    Hunt,
+    Flee,
+}
+
+#[derive(Default, Debug, Reflect)]
+struct Sleep {
+    duration: f32,
+}
+
+#[derive(Default, Debug, Reflect)]
+struct Chirp {
+    count: usize,
 }
 ```
 
@@ -51,7 +93,7 @@ This trait defines the possible transitions for your behavior.
 In this example:
   - a bird may sleep, fly, or chirp when idle
   - a bird may chirp when flying
-  - a bird may not fly or chirp when sleeping
+  - a bird may not do anything else when sleeping or chirping
 
 #### 3. Register the `Behavior` and its transition:
 Add a `BehaviorPlugin<T>` to your `App` to register the behavior events and types.
@@ -66,12 +108,18 @@ Usually, systems that cause behavior change should run before transition while s
   
 #### 4. Spawn a `BehaviorBundle`:
 For behavior system to work, you must insert your behavior using a `BehaviorBundle`.
-This bundle also inserts an instance of your behavior. This is referred to as the initial behavior.
+This bundle also inserts an instance of your behavior. This is referred to as the **Initial Behavior**.
+
 ```rust
 fn spawn_bird(mut commands: Commands) {
     commands.spawn(BehaviorBundle::<Bird>::default());
 }
 ```
+
+To spawn a bird with a specific initial behavior use `BehaviorBundle::<B>::new()`.
+
+> ⚠️ **WARNING**</br>
+> The initial behavior may never be stopped. Doing so would trigger an error.
 
 ### Transitions
 
@@ -80,8 +128,9 @@ An entity spawned with a `BehaviorBundle` may be queried using `BehaviorRef` and
 - `BehaviorRef` may be used to read the current/previous behaviors.
 - `BehaviorMut` may be used to read the current/previous behaviors and request behavior transitions.
 
-To access current behavior, use `Deref` on either `BehaviorRef` or `BehaviorMut`.<br/>
-To access previous behavior, use `.previous()`:
+To access current behavior, use `Deref`/`DerefMut` or `get`/`get_mut` on either `BehaviorRef` or `BehaviorMut`. To access previous behavior, use `.previous()`.
+
+For example:
 ```rust
 fn is_chirping_while_flying(bird: Query<BehaviorRef<Bird>>) -> bool {
     let behavior = bird.single();
@@ -113,15 +162,15 @@ fn reset(mut bird: Query<BehaviorMut<Bird>>) {
 When a transition is requested, it is not invoked immediately. Instead, it is invoked whenever the registered `transition()` system is run.
 You may register your systems before or after `transition()` to perform any logic as required.
 
-> **Warning**<br/>
-> Be mindful that only one transition may be invoked per application update, per entity. This is an intentional design choice.<br/>
+> ⚠️ **WARNING**<br/>
+> Be mindful that only one transition may be invoked per application update, per entity. This is an intentional design choice.
 > If multiple transitions are requested on the same entity within the same update cycle, only the last one is invoked, and a warning is logged.
 
 ### Events
 
 Any time a transition is invoked, an associated event is dispatched. These events may be used by other systems to react to behavior changes.
 
-Each event (except `StoppedEvent`) carries only the entity ID for which the behavior was started, paused, or resumed.
+Each event (except `StoppedEvent`) carries only the entity ID for which the behavior was started, paused, or resumed. `StoppedEvent` carries the entity ID in additional to the stopped behavior data.
 
 For `StartedEvent` and `ResumedEvent`, the behavior exists on the entity itself.
 You may access it either using a normal query (e.g. `Query<&Bird>`), or using `BehaviorRef`.
@@ -133,7 +182,7 @@ fn on_chirp_started(mut events: Started<Bird>, query: Query<BehaviorRef<Bird>>) 
         if let Chirp = *behavior {
             info!("{entity:?} has started chirping!");
         }
-  }
+    }
 }
 
 fn on_chirp_resumed(mut events: Resumed<Bird>, query: Query<BehaviorRef<Bird>>) {
@@ -143,7 +192,7 @@ fn on_chirp_resumed(mut events: Resumed<Bird>, query: Query<BehaviorRef<Bird>>) 
         if let Chirp = *behavior {
             info!("{entity:?} is chirping again!");
         }
-  }
+    }
 }
 ```
 For `PausedEvent`, the paused behavior is the previous behavior on the data, which is accessible using `.previous()`:
@@ -155,7 +204,7 @@ fn on_chirp_paused(mut events: Paused<Bird>, query: Query<BehaviorRef<Bird>>) {
         if let Chirp = behavior.previous() {
             info!("{entity:?} is no longer chirping.");
         }
-  }
+    }
 }
 ```
 For `StoppedEvent`, the stopped behavior is accessible through the event itself:
@@ -167,13 +216,13 @@ fn on_chirp_stopped(mut events: Stopped<Bird>) {
         if let Chirp = *behavior {
             info!("{entity:?} has stopped chirping.");
         }
-  }
+    }
 }
 ```
 ### Activation/Suspension
 
 In some cases, it may be necessary to run some logic if a behavior is paused OR stopped (suspension), or started OR resumed (activation).<br/>
-To handle activation and suspension, you may use a simple `Changed` query:
+To handle activation and suspension, you may use a standard [`Changed`](https://docs.rs/bevy/latest/bevy/ecs/query/struct.Changed.html) query:
 ```rust
 fn on_chirp_activated(query: Query<BehaviorRef<Bird>, Changed<Bird>>) {
     if let Ok(behavior) = query.get_single() {
