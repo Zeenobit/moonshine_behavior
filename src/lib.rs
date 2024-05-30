@@ -4,6 +4,7 @@ use std::{
     marker::PhantomData,
     mem::{replace, swap},
     ops::{Deref, DerefMut},
+    sync::{Arc, Mutex},
 };
 
 use bevy_app::{App, Plugin};
@@ -39,7 +40,8 @@ impl<B: Behavior + FromReflect + TypePath> Plugin for BehaviorPlugin<B> {
             .add_event::<StoppedEvent<B>>()
             .register_type::<Memory<B>>()
             .register_type::<Vec<B>>()
-            .register_type::<Transition<B>>();
+            .register_type::<Transition<B>>()
+            .register_type::<TransitionResponse<B>>();
     }
 }
 
@@ -130,9 +132,10 @@ impl<B: Behavior> BehaviorBundle<B> {
     }
 
     /// Tries to start the given [`Behavior`] as the next one immediately after insertion.
-    pub fn try_start(mut self, next: B) -> Self {
-        self.transition = Next(next);
-        self
+    pub fn try_start(&mut self, next: B) -> TransitionResponse<B> {
+        let response = TransitionResponse::new();
+        self.transition = Next(next, response.clone());
+        response
     }
 }
 
@@ -235,14 +238,16 @@ impl<B: Behavior> BehaviorMutItem<'_, B> {
     /// This only sets the behavior [`Transition`], and does not immediately modify the behavior.
     /// The next behavior will only start if it is allowed to by the [`transition()`] system.
     /// Otherwise, the transition is ignored.
-    pub fn try_start(&mut self, next: B) {
-        let previous = replace(self.transition.as_mut(), Next(next));
+    pub fn try_start(&mut self, next: B) -> TransitionResponse<B> {
+        let response = TransitionResponse::new();
+        let previous = replace(self.transition.as_mut(), Next(next, response.clone()));
         if !matches!(previous, Transition::Empty) {
             warn!(
                 "transition override: {previous:?} -> {:?}",
                 self.transition.as_ref(),
             );
         }
+        response
     }
 
     /// Stops the current [`Behavior`] and tries to resume the previous one.
@@ -342,22 +347,71 @@ pub enum Transition<B: Behavior> {
     #[default]
     Empty,
     #[reflect(ignore)]
-    Next(B),
+    Next(B, TransitionResponse<B>),
     #[reflect(ignore)]
     Previous,
     #[reflect(ignore)]
     Reset,
 }
 
-pub use Transition::{Next, Previous, Reset};
+use Transition::{Next, Previous, Reset};
 
 impl<B: Behavior> Transition<B> {
+    pub fn next(next: B) -> Self {
+        Self::Next(next, TransitionResponse::new())
+    }
+
+    pub fn previous() -> Self {
+        Self::Previous
+    }
+
+    pub fn reset() -> Self {
+        Self::Reset
+    }
+
     fn take(&mut self) -> Self {
         let mut t = Self::Empty;
         swap(self, &mut t);
         t
     }
 }
+
+#[derive(Debug, Reflect)]
+#[must_use]
+pub struct TransitionResponse<B: Behavior>(
+    #[allow(clippy::type_complexity)]
+    #[reflect(ignore)]
+    Arc<Mutex<Option<Result<(), InvalidTransition<B>>>>>,
+);
+
+impl<B: Behavior> TransitionResponse<B> {
+    pub fn new() -> Self {
+        Self(Arc::new(Mutex::new(None)))
+    }
+
+    pub fn poll(&self) -> Option<Result<(), InvalidTransition<B>>> {
+        self.0.lock().unwrap().take()
+    }
+
+    fn set(&mut self, value: Result<(), InvalidTransition<B>>) {
+        self.0.lock().unwrap().replace(value);
+    }
+}
+
+impl<B: Behavior> Default for TransitionResponse<B> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<B: Behavior> Clone for TransitionResponse<B> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+#[derive(Debug)]
+pub struct InvalidTransition<B: Behavior>(pub B);
 
 #[doc(hidden)]
 #[derive(SystemParam)]
@@ -492,7 +546,10 @@ pub fn transition<B: Behavior>(
 ) {
     for (entity, current, memory, mut transition) in &mut query {
         match transition.bypass_change_detection().take() {
-            Next(next) => push(entity, next, current, memory, &mut events),
+            Next(next, mut result) => {
+                let value = push(entity, next, current, memory, &mut events);
+                result.set(value);
+            }
             Previous => pop(entity, current, memory, &mut events),
             Reset => reset(entity, current, memory, &mut events),
             _ => (),
@@ -506,7 +563,7 @@ fn push<B: Behavior>(
     mut current: Mut<B>,
     mut memory: Mut<Memory<B>>,
     events: &mut Events<B>,
-) {
+) -> Result<(), InvalidTransition<B>> {
     if current.allows_next(&next) {
         debug!("{entity:?}: {:?} -> {next:?}", *current);
         let behavior = {
@@ -520,8 +577,10 @@ fn push<B: Behavior>(
             events.send_stopped(entity, behavior);
         }
         events.send_started(entity);
+        Ok(())
     } else {
         warn!("{entity:?}: {:?} -> {next:?} is not allowed", *current);
+        Err(InvalidTransition(next))
     }
 }
 

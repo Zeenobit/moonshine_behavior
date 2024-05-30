@@ -197,9 +197,9 @@ fn on_button_clicked(
     for (action, interaction) in query.iter() {
         if let Interaction::Pressed = interaction {
             match action {
-                Action::Fly => behavior.try_start(Fly),
-                Action::Sleep => behavior.try_start(Sleep),
-                Action::Chirp => behavior.try_start(Chirp),
+                Action::Fly => drop(behavior.try_start(Fly)),
+                Action::Sleep => drop(behavior.try_start(Sleep)),
+                Action::Chirp => drop(behavior.try_start(Chirp)),
                 Action::Stop => behavior.stop(),
                 Action::Reset => behavior.reset(),
             }

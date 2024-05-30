@@ -1,6 +1,6 @@
-use bevy::prelude::*;
+use bevy::{ecs::system::RunSystemOnce, prelude::*};
 
-use crate::{transition, Behavior, BehaviorBundle, BehaviorPlugin, Next, Previous, Reset};
+use crate::prelude::*;
 
 #[derive(Component, Default, Debug, PartialEq, Eq, Reflect)]
 enum B {
@@ -12,7 +12,11 @@ enum B {
 
 use B::*;
 
-impl Behavior for B {}
+impl Behavior for B {
+    fn allows_next(&self, next: &Self) -> bool {
+        !matches!((self, next), (S0, S2))
+    }
+}
 
 fn app() -> App {
     let mut app = App::new();
@@ -21,73 +25,67 @@ fn app() -> App {
     app
 }
 
-pub trait UpdateWith {
-    fn update_with<R, F>(self, f: F) -> R
-    where
-        F: Fn(&mut World) -> R;
-}
-
-impl UpdateWith for &mut App {
-    fn update_with<R, F>(self, f: F) -> R
-    where
-        F: Fn(&mut World) -> R,
-    {
-        let result = f(&mut self.world);
-        self.update();
-        result
-    }
-}
-
 #[test]
 fn initial() {
     let mut app = app();
-
     let entity = app.world.spawn(BehaviorBundle::new(S0)).id();
-
     assert_eq!(*app.world.get::<B>(entity).unwrap(), S0);
 }
 
 #[test]
 fn push() {
-    let mut app = app();
-    let entity = app.world.spawn(BehaviorBundle::new(S0)).id();
+    let mut a = app();
+    let e = a.world.spawn(BehaviorBundle::new(S0)).id();
+    let r = a
+        .world
+        .run_system_once(|mut q: Query<BehaviorMut<B>>| q.single_mut().try_start(S1));
+    a.update();
+    assert!(r.poll().unwrap().is_ok());
+    assert_eq!(*a.world.get::<B>(e).unwrap(), S1);
+}
 
-    app.update_with(|world| {
-        world.entity_mut(entity).insert(Next(S1));
-    });
-
-    assert_eq!(*app.world.get::<B>(entity).unwrap(), S1);
+#[test]
+fn push_fail() {
+    let mut a = app();
+    let e = a.world.spawn(BehaviorBundle::new(S0)).id();
+    let r = a
+        .world
+        .run_system_once(|mut q: Query<BehaviorMut<B>>| q.single_mut().try_start(S2));
+    a.update();
+    assert!(r.poll().unwrap().is_err());
+    assert_eq!(*a.world.get::<B>(e).unwrap(), S0);
 }
 
 #[test]
 fn pop() {
-    let mut app = app();
-    let entity = app.world.spawn(BehaviorBundle::new(S0)).id();
-
-    app.update_with(|world| {
-        world.entity_mut(entity).insert(Next(S1));
+    let mut a = app();
+    let e = a.world.spawn(BehaviorBundle::new(S0)).id();
+    let _ = a
+        .world
+        .run_system_once(|mut q: Query<BehaviorMut<B>>| q.single_mut().try_start(S1));
+    a.update();
+    a.world.run_system_once(|mut q: Query<BehaviorMut<B>>| {
+        q.single_mut().stop();
     });
-    app.update_with(|world| {
-        world.entity_mut(entity).insert(Previous::<B>);
-    });
-
-    assert_eq!(*app.world.get::<B>(entity).unwrap(), S0);
+    a.update();
+    assert_eq!(*a.world.get::<B>(e).unwrap(), S0);
 }
 
 #[test]
 fn reset() {
-    let mut app = app();
-    let entity = app.world.spawn(BehaviorBundle::new(S0)).id();
-
-    app.update_with(|world| {
-        world.entity_mut(entity).insert(Next(S1));
+    let mut a = app();
+    let e = a.world.spawn(BehaviorBundle::new(S0)).id();
+    let _ = a
+        .world
+        .run_system_once(|mut q: Query<BehaviorMut<B>>| q.single_mut().try_start(S1));
+    a.update();
+    let _ = a
+        .world
+        .run_system_once(|mut q: Query<BehaviorMut<B>>| q.single_mut().try_start(S2));
+    a.update();
+    a.world.run_system_once(|mut q: Query<BehaviorMut<B>>| {
+        q.single_mut().reset();
     });
-    app.update_with(|world| {
-        world.entity_mut(entity).insert(Next(S2));
-    });
-    app.update_with(|world| {
-        world.entity_mut(entity).insert(Reset::<B>);
-    });
-
-    assert_eq!(*app.world.get::<B>(entity).unwrap(), S0);
+    a.update();
+    assert_eq!(*a.world.get::<B>(e).unwrap(), S0);
 }
