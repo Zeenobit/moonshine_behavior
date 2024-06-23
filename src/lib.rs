@@ -14,8 +14,8 @@ use bevy_utils::tracing::{debug, error, warn};
 
 pub mod prelude {
     pub use crate::{
-        transition, BehaviorPlugin, {Behavior, BehaviorBundle}, {BehaviorMut, BehaviorRef},
-        {Paused, Resumed, Started, Stopped},
+        BehaviorPlugin, {transition, TransitionResponse}, {Behavior, BehaviorBundle},
+        {BehaviorMut, BehaviorRef}, {Paused, Resumed, Started, Stopped},
         {PausedEvent, ResumedEvent, StartedEvent, StoppedEvent},
     };
 }
