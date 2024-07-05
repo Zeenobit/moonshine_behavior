@@ -9,7 +9,7 @@ use std::{
 
 use bevy_app::{App, Plugin};
 use bevy_ecs::{prelude::*, query::QueryData, system::SystemParam};
-use bevy_reflect::{FromReflect, Reflect, TypePath};
+use bevy_reflect::{FromReflect, GetTypeRegistration, Reflect, TypePath};
 use bevy_utils::tracing::{debug, error, warn};
 
 pub mod prelude {
@@ -32,7 +32,7 @@ impl<B: Behavior> Default for BehaviorPlugin<B> {
     }
 }
 
-impl<B: Behavior + FromReflect + TypePath> Plugin for BehaviorPlugin<B> {
+impl<B: Behavior + FromReflect + TypePath + GetTypeRegistration> Plugin for BehaviorPlugin<B> {
     fn build(&self, app: &mut App) {
         app.add_event::<StartedEvent<B>>()
             .add_event::<PausedEvent<B>>()

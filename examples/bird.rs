@@ -87,7 +87,7 @@ fn setup(asset_server: Res<AssetServer>, mut commands: Commands) {
                 padding: UiRect::all(Val::Px(20.)),
                 ..Default::default()
             },
-            background_color: BackgroundColor(Color::GRAY),
+            background_color: BackgroundColor(bevy::color::palettes::css::GRAY.into()),
             ..Default::default()
         })
         .with_children(|root| {
@@ -179,9 +179,9 @@ fn update_buttons(
                 _ => true,
             };
             color.0 = if is_allowed {
-                Color::DARK_GREEN
+                bevy::color::palettes::css::DARK_GREEN.into()
             } else {
-                Color::RED
+                bevy::color::palettes::css::RED.into()
             };
         }
     }
@@ -218,7 +218,7 @@ fn spawn_button(
         .spawn((
             action,
             ButtonBundle {
-                background_color: Color::DARK_GRAY.into(),
+                background_color: bevy::color::palettes::css::DARK_GRAY.into(),
                 style: Style {
                     margin: UiRect::all(Val::Px(5.)),
                     padding: UiRect::new(Val::Px(10.), Val::Px(10.), Val::Px(5.), Val::Px(5.)),
