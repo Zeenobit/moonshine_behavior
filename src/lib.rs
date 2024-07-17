@@ -154,14 +154,17 @@ pub struct BehaviorRef<B: Behavior> {
 }
 
 impl<B: Behavior> BehaviorRefItem<'_, B> {
+    /// Returns a reference to the current [`Behavior`].
     pub fn get(&self) -> &B {
         self.behavior
     }
 
+    /// Returns `true` if a [`Transition`] is currently in progress.
     pub fn has_transition(&self) -> bool {
         !matches!(self.transition, Transition::Empty)
     }
 
+    /// Returns a reference to the previous [`Behavior`], if it exists.
     pub fn previous(&self) -> Option<&B> {
         self.memory.previous()
     }
@@ -196,6 +199,7 @@ impl<B: Behavior> BehaviorMutReadOnlyItem<'_, B> {
         self.behavior
     }
 
+    /// Returns `true` if a [`Transition`] is currently in progress.
     pub fn has_transition(&self) -> bool {
         !matches!(self.transition, Transition::Empty)
     }
@@ -221,14 +225,17 @@ impl<B: Behavior> Borrow<B> for BehaviorMutReadOnlyItem<'_, B> {
 }
 
 impl<B: Behavior> BehaviorMutItem<'_, B> {
+    /// Returns a reference to the current [`Behavior`].
     pub fn get(&self) -> &B {
         &self.behavior
     }
 
+    /// Returns a mutable reference to the current [`Behavior`].
     pub fn get_mut(&mut self) -> &mut B {
         &mut self.behavior
     }
 
+    /// Returns `true` if a [`Transition`] is currently in progress.
     pub fn has_transition(&self) -> bool {
         !matches!(*self.transition, Transition::Empty)
     }
