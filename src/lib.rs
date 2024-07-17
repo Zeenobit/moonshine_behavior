@@ -168,6 +168,11 @@ impl<B: Behavior> BehaviorRefItem<'_, B> {
     pub fn previous(&self) -> Option<&B> {
         self.memory.previous()
     }
+
+    /// Returns a reference to the [`Behavior`] [`Memory`].
+    pub fn memory(&self) -> &Memory<B> {
+        self.memory
+    }
 }
 
 impl<B: Behavior> Deref for BehaviorRefItem<'_, B> {
@@ -207,6 +212,11 @@ impl<B: Behavior> BehaviorMutReadOnlyItem<'_, B> {
     /// Returns a reference to the previous [`Behavior`], if it exists.
     pub fn previous(&self) -> Option<&B> {
         self.memory.previous()
+    }
+
+    /// Returns a reference to the [`Behavior`] [`Memory`].
+    pub fn memory(&self) -> &Memory<B> {
+        self.memory
     }
 }
 
@@ -290,6 +300,11 @@ impl<B: Behavior> BehaviorMutItem<'_, B> {
     pub fn previous(&self) -> Option<&B> {
         self.memory.previous()
     }
+
+    /// Returns a reference to the [`Behavior`] [`Memory`].
+    pub fn memory(&self) -> &Memory<B> {
+        self.memory
+    }
 }
 
 impl<B: Behavior> Deref for BehaviorMutItem<'_, B> {
@@ -318,18 +333,40 @@ impl<B: Behavior> BorrowMut<B> for BehaviorMutItem<'_, B> {
     }
 }
 
-/// A [`Component`] which stores paused [`Behavior`] components to be resumed later.
+/// A [`Component`] which stores a stack of paused [`Behavior`] states to be resumed later.
 #[derive(Component, Clone, Reflect)]
 #[reflect(Component)]
 pub struct Memory<B: Behavior>(Vec<B>);
 
 impl<B: Behavior> Memory<B> {
-    fn previous(&self) -> Option<&B> {
-        self.0.last()
+    /// Returns the number of paused [`Behavior`] states in the stack.
+    pub fn len(&self) -> usize {
+        self.0.len()
     }
 
-    fn len(&self) -> usize {
-        self.0.len()
+    /// Returns `true` if the stack is empty.
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// Returns an iterator over the paused [`Behavior`] states in the stack.
+    ///
+    /// The iterator starts from the most recently paused state (previous).
+    pub fn iter(&self) -> impl Iterator<Item = &B> {
+        self.0.iter().rev()
+    }
+
+    /// Returns `true` if the stack contains the given [`Behavior`] state.
+    pub fn contains(&self, behavior: &B) -> bool
+    where
+        B: PartialEq,
+    {
+        self.0.contains(behavior)
+    }
+
+    /// Returns a reference to the previous [`Behavior`] state, if it exists.
+    pub fn previous(&self) -> Option<&B> {
+        self.0.last()
     }
 
     fn push(&mut self, behavior: B) {
