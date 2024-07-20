@@ -4,18 +4,19 @@ use std::{
     marker::PhantomData,
     mem::{replace, swap},
     ops::{Deref, DerefMut},
-    sync::{Arc, Mutex},
 };
 
 use bevy_app::{App, Plugin};
 use bevy_ecs::{prelude::*, query::QueryData, system::SystemParam};
 use bevy_reflect::{FromReflect, GetTypeRegistration, Reflect, TypePath};
 use bevy_utils::tracing::{debug, error, warn};
+use moonshine_util::future::{Future, Promise};
 
 pub mod prelude {
     pub use crate::{
-        BehaviorPlugin, {transition, TransitionResponse}, {Behavior, BehaviorBundle},
-        {BehaviorMut, BehaviorRef}, {Paused, Resumed, Started, Stopped},
+        BehaviorPlugin, {transition, InvalidTransition, TransitionResult},
+        {Behavior, BehaviorBundle}, {BehaviorMut, BehaviorRef},
+        {Paused, Resumed, Started, Stopped},
         {PausedEvent, ResumedEvent, StartedEvent, StoppedEvent},
     };
 }
@@ -40,8 +41,7 @@ impl<B: Behavior + FromReflect + TypePath + GetTypeRegistration> Plugin for Beha
             .add_event::<StoppedEvent<B>>()
             .register_type::<Memory<B>>()
             .register_type::<Vec<B>>()
-            .register_type::<Transition<B>>()
-            .register_type::<TransitionResponse<B>>();
+            .register_type::<Transition<B>>();
     }
 }
 
@@ -111,11 +111,26 @@ pub trait Behavior: Component + Debug {
 }
 
 /// A [`Bundle`] which contains a [`Behavior`] and other required components for it to function.
-#[derive(Bundle, Default, Clone)]
+#[derive(Bundle, Default)]
 pub struct BehaviorBundle<B: Behavior> {
     behavior: B,
     memory: Memory<B>,
     transition: Transition<B>,
+}
+
+impl<B: Behavior + Clone> Clone for BehaviorBundle<B> {
+    fn clone(&self) -> Self {
+        Self {
+            behavior: self.behavior.clone(),
+            memory: self.memory.clone(),
+            transition: match &self.transition {
+                Next(next, _) => Next(next.clone(), Promise::new()),
+                Previous => Previous,
+                Reset => Reset,
+                Transition::Empty => Transition::Empty,
+            },
+        }
+    }
 }
 
 impl<B: Behavior> BehaviorBundle<B> {
@@ -132,10 +147,11 @@ impl<B: Behavior> BehaviorBundle<B> {
     }
 
     /// Tries to start the given [`Behavior`] as the next one immediately after insertion.
-    pub fn try_start(&mut self, next: B) -> TransitionResponse<B> {
-        let response = TransitionResponse::new();
-        self.transition = Next(next, response.clone());
-        response
+    pub fn try_start(&mut self, next: B) -> Future<TransitionResult<B>> {
+        let promise = Promise::new();
+        let future = Future::new(&promise);
+        self.transition = Next(next, promise);
+        future
     }
 }
 
@@ -255,16 +271,17 @@ impl<B: Behavior> BehaviorMutItem<'_, B> {
     /// This only sets the behavior [`Transition`], and does not immediately modify the behavior.
     /// The next behavior will only start if it is allowed to by the [`transition()`] system.
     /// Otherwise, the transition is ignored.
-    pub fn try_start(&mut self, next: B) -> TransitionResponse<B> {
-        let response = TransitionResponse::new();
-        let previous = replace(self.transition.as_mut(), Next(next, response.clone()));
+    pub fn try_start(&mut self, next: B) -> Future<TransitionResult<B>> {
+        let promise = Promise::new();
+        let future = Future::new(&promise);
+        let previous = replace(self.transition.as_mut(), Next(next, promise));
         if !matches!(previous, Transition::Empty) {
             warn!(
                 "transition override: {previous:?} -> {:?}",
                 self.transition.as_ref(),
             );
         }
-        response
+        future
     }
 
     /// Stops the current [`Behavior`] and tries to resume the previous one.
@@ -385,13 +402,13 @@ impl<B: Behavior> Default for Memory<B> {
 }
 
 /// A [`Component`] used to trigger [`Behavior`] transitions.
-#[derive(Component, Default, Clone, Debug, Reflect)]
+#[derive(Component, Default, Reflect)]
 #[reflect(Component)]
 pub enum Transition<B: Behavior> {
     #[default]
     Empty,
     #[reflect(ignore)]
-    Next(B, TransitionResponse<B>),
+    Next(B, #[reflect(ignore)] Promise<TransitionResult<B>>),
     #[reflect(ignore)]
     Previous,
     #[reflect(ignore)]
@@ -402,7 +419,7 @@ use Transition::{Next, Previous, Reset};
 
 impl<B: Behavior> Transition<B> {
     pub fn next(next: B) -> Self {
-        Self::Next(next, TransitionResponse::new())
+        Self::Next(next, Promise::new())
     }
 
     pub fn previous() -> Self {
@@ -420,39 +437,18 @@ impl<B: Behavior> Transition<B> {
     }
 }
 
-#[derive(Debug, Reflect)]
-#[must_use]
-pub struct TransitionResponse<B: Behavior>(
-    #[allow(clippy::type_complexity)]
-    #[reflect(ignore)]
-    Arc<Mutex<Option<Result<(), InvalidTransition<B>>>>>,
-);
-
-impl<B: Behavior> TransitionResponse<B> {
-    pub fn new() -> Self {
-        Self(Arc::new(Mutex::new(None)))
-    }
-
-    pub fn poll(&self) -> Option<Result<(), InvalidTransition<B>>> {
-        self.0.lock().unwrap().take()
-    }
-
-    fn set(&mut self, value: Result<(), InvalidTransition<B>>) {
-        self.0.lock().unwrap().replace(value);
+impl<B: Behavior> Debug for Transition<B> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Empty => write!(f, "None"),
+            Next(arg0, _) => f.debug_tuple("Next").field(arg0).finish(),
+            Previous => write!(f, "Previous"),
+            Reset => write!(f, "Reset"),
+        }
     }
 }
 
-impl<B: Behavior> Default for TransitionResponse<B> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<B: Behavior> Clone for TransitionResponse<B> {
-    fn clone(&self) -> Self {
-        Self(self.0.clone())
-    }
-}
+pub type TransitionResult<B> = Result<(), InvalidTransition<B>>;
 
 #[derive(Debug)]
 pub struct InvalidTransition<B: Behavior>(pub B);
@@ -590,9 +586,9 @@ pub fn transition<B: Behavior>(
 ) {
     for (entity, current, memory, mut transition) in &mut query {
         match transition.bypass_change_detection().take() {
-            Next(next, mut result) => {
+            Next(next, promise) => {
                 let value = push(entity, next, current, memory, &mut events);
-                result.set(value);
+                promise.done(value);
             }
             Previous => pop(entity, current, memory, &mut events),
             Reset => reset(entity, current, memory, &mut events),
@@ -607,7 +603,7 @@ fn push<B: Behavior>(
     mut current: Mut<B>,
     mut memory: Mut<Memory<B>>,
     events: &mut Events<B>,
-) -> Result<(), InvalidTransition<B>> {
+) -> TransitionResult<B> {
     if current.allows_next(&next) {
         debug!("{entity:?}: {:?} -> {next:?}", *current);
         let behavior = {

@@ -14,6 +14,7 @@ bevy_app = "0.14.*"
 bevy_ecs = "0.14.*"
 bevy_reflect = "0.14.*"
 bevy_utils = "0.14.*"
+moonshine-util = { version = "0.2.4", path = "../core/crates/util" }
 
 [dev-dependencies]
 bevy = "0.14.*"
