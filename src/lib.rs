@@ -588,7 +588,7 @@ pub fn transition<B: Behavior>(
         match transition.bypass_change_detection().take() {
             Next(next, promise) => {
                 let value = push(entity, next, current, memory, &mut events);
-                promise.done(value);
+                promise.set(value);
             }
             Previous => pop(entity, current, memory, &mut events),
             Reset => reset(entity, current, memory, &mut events),
