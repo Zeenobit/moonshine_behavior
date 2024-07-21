@@ -1,6 +1,6 @@
 [package]
 name = "moonshine-behavior"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2021"
 license = "MIT"
 description = "Minimalistic state machine for Bevy game engine."
@@ -14,7 +14,7 @@ bevy_app = "0.14.*"
 bevy_ecs = "0.14.*"
 bevy_reflect = "0.14.*"
 bevy_utils = "0.14.*"
-moonshine-util = { version = "0.2.4", path = "../core/crates/util" }
+moonshine-util = { version = "0.2.*", path = "../core/crates/util" }
 
 [dev-dependencies]
 bevy = "0.14.*"
