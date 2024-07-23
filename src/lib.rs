@@ -148,8 +148,7 @@ impl<B: Behavior> BehaviorBundle<B> {
 
     /// Tries to start the given [`Behavior`] as the next one immediately after insertion.
     pub fn try_start(&mut self, next: B) -> Future<TransitionResult<B>> {
-        let promise = Promise::new();
-        let future = Future::new(&promise);
+        let (promise, future) = Promise::start();
         self.transition = Next(next, promise);
         future
     }
