@@ -163,7 +163,7 @@ impl<B: Behavior> From<B> for BehaviorBundle<B> {
 /// A [`QueryData`] used to query a [`Behavior`].
 #[derive(QueryData)]
 pub struct BehaviorRef<B: Behavior> {
-    behavior: &'static B,
+    behavior: Ref<'static, B>,
     memory: &'static Memory<B>,
     transition: &'static Transition<B>,
 }
@@ -171,7 +171,17 @@ pub struct BehaviorRef<B: Behavior> {
 impl<B: Behavior> BehaviorRefItem<'_, B> {
     /// Returns a reference to the current [`Behavior`].
     pub fn get(&self) -> &B {
-        self.behavior
+        &self.behavior
+    }
+
+    /// Returns `true` if the current [`Behavior`] was changed since last query.
+    pub fn is_changed(&self) -> bool {
+        self.behavior.is_changed()
+    }
+
+    /// Returns a reference to the current [`Behavior`] if it was changed since last query.
+    pub fn get_changed(&self) -> Option<&B> {
+        self.is_changed().then(|| self.get())
     }
 
     /// Returns `true` if a [`Transition`] is currently in progress.
@@ -194,13 +204,13 @@ impl<B: Behavior> Deref for BehaviorRefItem<'_, B> {
     type Target = B;
 
     fn deref(&self) -> &Self::Target {
-        self.behavior
+        &self.behavior
     }
 }
 
 impl<B: Behavior> Borrow<B> for BehaviorRefItem<'_, B> {
     fn borrow(&self) -> &B {
-        self.behavior
+        &self.behavior
     }
 }
 
@@ -208,7 +218,7 @@ impl<B: Behavior> Borrow<B> for BehaviorRefItem<'_, B> {
 #[derive(QueryData)]
 #[query_data(mutable)]
 pub struct BehaviorMut<B: Behavior> {
-    behavior: &'static mut B,
+    behavior: Mut<'static, B>,
     memory: &'static Memory<B>,
     transition: &'static mut Transition<B>,
 }
@@ -216,7 +226,17 @@ pub struct BehaviorMut<B: Behavior> {
 impl<B: Behavior> BehaviorMutReadOnlyItem<'_, B> {
     /// Returns a reference to the current [`Behavior`].
     pub fn get(&self) -> &B {
-        self.behavior
+        &self.behavior
+    }
+
+    /// Returns `true` if the current [`Behavior`] was changed since last query.
+    pub fn is_changed(&self) -> bool {
+        self.behavior.is_changed()
+    }
+
+    /// Returns a reference to the current [`Behavior`] if it was changed since last query.
+    pub fn get_changed(&self) -> Option<&B> {
+        self.is_changed().then(|| self.get())
     }
 
     /// Returns `true` if a [`Transition`] is currently in progress.
@@ -239,13 +259,13 @@ impl<B: Behavior> Deref for BehaviorMutReadOnlyItem<'_, B> {
     type Target = B;
 
     fn deref(&self) -> &Self::Target {
-        self.behavior
+        &self.behavior
     }
 }
 
 impl<B: Behavior> Borrow<B> for BehaviorMutReadOnlyItem<'_, B> {
     fn borrow(&self) -> &B {
-        self.behavior
+        &self.behavior
     }
 }
 
@@ -258,6 +278,21 @@ impl<B: Behavior> BehaviorMutItem<'_, B> {
     /// Returns a mutable reference to the current [`Behavior`].
     pub fn get_mut(&mut self) -> &mut B {
         &mut self.behavior
+    }
+
+    /// Returns `true` if the current [`Behavior`] was changed since last query.
+    pub fn is_changed(&self) -> bool {
+        self.behavior.is_changed()
+    }
+
+    /// Returns a reference to the current [`Behavior`] if it was changed since last query.
+    pub fn get_changed(&self) -> Option<&B> {
+        self.is_changed().then(|| self.get())
+    }
+
+    /// Returns a mutable reference to the current [`Behavior`] if it was changed since last query.
+    pub fn get_changed_mut(&mut self) -> Option<&mut B> {
+        self.is_changed().then(|| self.get_mut())
     }
 
     /// Returns `true` if a [`Transition`] is currently in progress.
