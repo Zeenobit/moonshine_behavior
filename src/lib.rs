@@ -350,8 +350,9 @@ impl<B: Behavior> BehaviorMutItem<'_, B> {
     /// Otherwise, the transition is ignored.
     pub fn try_start(&mut self, next: B) -> Future<TransitionResult<B>> {
         let (transition, future) = Transition::next(next);
+        let had_transition = self.has_transition();
         let previous = replace(self.transition.as_mut(), transition);
-        if !matches!(previous, Transition::Stable) {
+        if had_transition {
             warn!(
                 "transition override: {previous:?} -> {:?}",
                 self.transition.as_ref(),
