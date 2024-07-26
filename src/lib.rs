@@ -120,6 +120,7 @@ pub struct BehaviorBundle<B: Behavior> {
 
 impl<B: Behavior + Clone> Clone for BehaviorBundle<B> {
     fn clone(&self) -> Self {
+        use Transition::*;
         Self {
             behavior: self.behavior.clone(),
             memory: self.memory.clone(),
@@ -148,8 +149,8 @@ impl<B: Behavior> BehaviorBundle<B> {
 
     /// Tries to start the given [`Behavior`] as the next one immediately after insertion.
     pub fn try_start(&mut self, next: B) -> Future<TransitionResult<B>> {
-        let (promise, future) = Promise::start();
-        self.transition = Next(next, promise);
+        let (transition, future) = Transition::next(next);
+        self.transition = transition;
         future
     }
 }
@@ -306,9 +307,8 @@ impl<B: Behavior> BehaviorMutItem<'_, B> {
     /// The next behavior will only start if it is allowed to by the [`transition()`] system.
     /// Otherwise, the transition is ignored.
     pub fn try_start(&mut self, next: B) -> Future<TransitionResult<B>> {
-        let promise = Promise::new();
-        let future = Future::new(&promise);
-        let previous = replace(self.transition.as_mut(), Next(next, promise));
+        let (transition, future) = Transition::next(next);
+        let previous = replace(self.transition.as_mut(), transition);
         if !matches!(previous, Transition::Empty) {
             warn!(
                 "transition override: {previous:?} -> {:?}",
@@ -325,7 +325,7 @@ impl<B: Behavior> BehaviorMutItem<'_, B> {
     ///
     /// If the current behavior is the initial one, it does nothing.
     pub fn stop(&mut self) {
-        let previous = replace(self.transition.as_mut(), Previous);
+        let previous = replace(self.transition.as_mut(), Transition::previous());
         if !matches!(previous, Transition::Empty) {
             warn!(
                 "transition override: {previous:?} -> {:?}",
@@ -338,7 +338,7 @@ impl<B: Behavior> BehaviorMutItem<'_, B> {
     ///
     /// If the current behavior is the initial one, it does nothing.
     pub fn reset(&mut self) {
-        let previous = replace(self.transition.as_mut(), Reset);
+        let previous = replace(self.transition.as_mut(), Transition::reset());
         if !matches!(previous, Transition::Empty) {
             warn!(
                 "transition override: {previous:?} -> {:?}",
@@ -449,11 +449,11 @@ pub enum Transition<B: Behavior> {
     Reset,
 }
 
-use Transition::{Next, Previous, Reset};
-
 impl<B: Behavior> Transition<B> {
-    pub fn next(next: B) -> Self {
-        Self::Next(next, Promise::new())
+    pub fn next(next: B) -> (Self, Future<TransitionResult<B>>) {
+        let (promise, future) = Promise::start();
+        let transition = Self::Next(next, promise);
+        (transition, future)
     }
 
     pub fn previous() -> Self {
@@ -473,8 +473,9 @@ impl<B: Behavior> Transition<B> {
 
 impl<B: Behavior> Debug for Transition<B> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use Transition::*;
         match self {
-            Self::Empty => write!(f, "None"),
+            Empty => write!(f, "None"),
             Next(arg0, _) => f.debug_tuple("Next").field(arg0).finish(),
             Previous => write!(f, "Previous"),
             Reset => write!(f, "Reset"),
@@ -619,6 +620,7 @@ pub fn transition<B: Behavior>(
     mut events: Events<B>,
 ) {
     for (entity, current, memory, mut transition) in &mut query {
+        use Transition::*;
         match transition.bypass_change_detection().take() {
             Next(next, promise) => {
                 let value = push(entity, next, current, memory, &mut events);
@@ -626,7 +628,7 @@ pub fn transition<B: Behavior>(
             }
             Previous => pop(entity, current, memory, &mut events),
             Reset => reset(entity, current, memory, &mut events),
-            _ => (),
+            Empty => {}
         }
     }
 }
