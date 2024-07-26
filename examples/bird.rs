@@ -1,7 +1,6 @@
 use bevy::prelude::*;
 use moonshine_behavior::prelude::*;
 
-const FONT_PATH: &str = "fonts/RobotoCondensed-Regular.ttf";
 const HELP_TEXT: &str = "This example simulates the state of a bird.
 Each button corresponds to an action available to the bird. A red button means the action is not allowed.
 When idle, the bird can sleep, chirp, or fly. When sleeping, the bird cannot chirp, or fly.
@@ -74,7 +73,7 @@ enum Action {
 }
 
 // Spawn a Bird and setup UI.
-fn setup(asset_server: Res<AssetServer>, mut commands: Commands) {
+fn setup(mut commands: Commands) {
     commands.spawn(BehaviorBundle::<Bird>::default());
     commands.spawn(Camera2dBundle::default());
     commands
@@ -95,9 +94,9 @@ fn setup(asset_server: Res<AssetServer>, mut commands: Commands) {
                 text: Text::from_section(
                     HELP_TEXT,
                     TextStyle {
-                        font: asset_server.load(FONT_PATH),
                         font_size: 20.,
                         color: Color::WHITE,
+                        ..default()
                     },
                 ),
                 style: Style {
@@ -112,9 +111,9 @@ fn setup(asset_server: Res<AssetServer>, mut commands: Commands) {
                     text: Text::from_section(
                         "",
                         TextStyle {
-                            font: asset_server.load(FONT_PATH),
                             font_size: 25.,
                             color: Color::WHITE,
+                            ..default()
                         },
                     ),
                     ..default()
@@ -131,11 +130,11 @@ fn setup(asset_server: Res<AssetServer>, mut commands: Commands) {
                 ..default()
             })
             .with_children(|parent| {
-                spawn_button(parent, &asset_server, "Fly", Action::Fly);
-                spawn_button(parent, &asset_server, "Sleep", Action::Sleep);
-                spawn_button(parent, &asset_server, "Chirp", Action::Chirp);
-                spawn_button(parent, &asset_server, "Stop", Action::Stop);
-                spawn_button(parent, &asset_server, "Reset", Action::Reset);
+                spawn_button(parent, "Fly", Action::Fly);
+                spawn_button(parent, "Sleep", Action::Sleep);
+                spawn_button(parent, "Chirp", Action::Chirp);
+                spawn_button(parent, "Stop", Action::Stop);
+                spawn_button(parent, "Reset", Action::Reset);
             });
         });
 }
@@ -208,12 +207,7 @@ fn on_button_clicked(
 }
 
 // Spawn a button with the given text and action.
-fn spawn_button(
-    parent: &mut ChildBuilder,
-    asset_server: &Res<AssetServer>,
-    text: impl Into<String>,
-    action: Action,
-) {
+fn spawn_button(parent: &mut ChildBuilder, text: impl Into<String>, action: Action) {
     parent
         .spawn((
             action,
@@ -232,9 +226,9 @@ fn spawn_button(
                 text: Text::from_section(
                     text,
                     TextStyle {
-                        font: asset_server.load("fonts/RobotoCondensed-Regular.ttf"),
                         font_size: 20.,
                         color: Color::WHITE,
+                        ..default()
                     },
                 ),
                 ..default()
