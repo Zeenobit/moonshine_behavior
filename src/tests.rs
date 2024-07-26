@@ -27,9 +27,17 @@ fn app() -> App {
 
 #[test]
 fn initial() {
-    let mut app = app();
-    let entity = app.world_mut().spawn(BehaviorBundle::new(S0)).id();
-    assert_eq!(*app.world().get::<B>(entity).unwrap(), S0);
+    let mut a = app();
+    let e = a.world_mut().spawn(BehaviorBundle::new(S0)).id();
+    assert_eq!(*a.world().get::<B>(e).unwrap(), S0);
+    assert!(a
+        .world_mut()
+        .run_system_once(|q: Query<BehaviorRef<B>>| { q.single().is_started() }));
+
+    a.update();
+    assert!(a
+        .world_mut()
+        .run_system_once(|q: Query<BehaviorRef<B>>| { q.single().is_stable() }));
 }
 
 #[test]
@@ -42,6 +50,14 @@ fn push() {
     a.update();
     assert!(r.poll().unwrap().is_ok());
     assert_eq!(*a.world().get::<B>(e).unwrap(), S1);
+    assert!(a
+        .world_mut()
+        .run_system_once(|q: Query<BehaviorRef<B>>| { q.single().is_started() }));
+
+    a.update();
+    assert!(a
+        .world_mut()
+        .run_system_once(|q: Query<BehaviorRef<B>>| { q.single().is_stable() }));
 }
 
 #[test]
@@ -54,6 +70,9 @@ fn push_fail() {
     a.update();
     assert!(r.poll().unwrap().is_err());
     assert_eq!(*a.world_mut().get::<B>(e).unwrap(), S0);
+    assert!(a
+        .world_mut()
+        .run_system_once(|q: Query<BehaviorRef<B>>| { q.single().is_stable() }));
 }
 
 #[test]
@@ -70,6 +89,14 @@ fn pop() {
         });
     a.update();
     assert_eq!(*a.world().get::<B>(e).unwrap(), S0);
+    assert!(a
+        .world_mut()
+        .run_system_once(|q: Query<BehaviorRef<B>>| { q.single().is_resumed() }));
+
+    a.update();
+    assert!(a
+        .world_mut()
+        .run_system_once(|q: Query<BehaviorRef<B>>| { q.single().is_stable() }));
 }
 
 #[test]
@@ -90,4 +117,12 @@ fn reset() {
         });
     a.update();
     assert_eq!(*a.world().get::<B>(e).unwrap(), S0);
+    assert!(a
+        .world_mut()
+        .run_system_once(|q: Query<BehaviorRef<B>>| { q.single().is_resumed() }));
+
+    a.update();
+    assert!(a
+        .world_mut()
+        .run_system_once(|q: Query<BehaviorRef<B>>| { q.single().is_stable() }));
 }

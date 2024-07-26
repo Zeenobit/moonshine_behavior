@@ -120,16 +120,10 @@ pub struct BehaviorBundle<B: Behavior> {
 
 impl<B: Behavior + Clone> Clone for BehaviorBundle<B> {
     fn clone(&self) -> Self {
-        use Transition::*;
         Self {
             behavior: self.behavior.clone(),
             memory: self.memory.clone(),
-            transition: match &self.transition {
-                Next(next, _) => Next(next.clone(), Promise::new()),
-                Previous => Previous,
-                Reset => Reset,
-                Transition::Empty => Transition::Empty,
-            },
+            transition: self.transition.clone(),
         }
     }
 }
@@ -143,7 +137,7 @@ impl<B: Behavior> BehaviorBundle<B> {
         Self {
             behavior,
             memory: Memory::default(),
-            transition: Transition::default(),
+            transition: Transition::Started, // Initial Behavior
         }
     }
 
@@ -180,6 +174,21 @@ impl<B: Behavior> BehaviorRefItem<'_, B> {
         self.behavior.is_changed()
     }
 
+    /// Returns `true` if the current [`Behavior`] was just started.
+    pub fn is_started(&self) -> bool {
+        matches!(self.transition, Transition::Started)
+    }
+
+    /// Returns `true` if the current [`Behavior`] was just resumed.
+    pub fn is_resumed(&self) -> bool {
+        matches!(self.transition, Transition::Resumed)
+    }
+
+    /// Returns `true` if the current [`Behavior`] is active and not in a transition.
+    pub fn is_stable(&self) -> bool {
+        matches!(self.transition, Transition::Stable)
+    }
+
     /// Returns a reference to the current [`Behavior`] if it was changed since last query.
     pub fn get_changed(&self) -> Option<&B> {
         self.is_changed().then(|| self.get())
@@ -187,7 +196,8 @@ impl<B: Behavior> BehaviorRefItem<'_, B> {
 
     /// Returns `true` if a [`Transition`] is currently in progress.
     pub fn has_transition(&self) -> bool {
-        !matches!(self.transition, Transition::Empty)
+        use Transition::*;
+        !matches!(self.transition, Stable | Started | Resumed)
     }
 
     /// Returns a reference to the previous [`Behavior`], if it exists.
@@ -235,6 +245,21 @@ impl<B: Behavior> BehaviorMutReadOnlyItem<'_, B> {
         self.behavior.is_changed()
     }
 
+    /// Returns `true` if the current [`Behavior`] was just started.
+    pub fn is_started(&self) -> bool {
+        matches!(self.transition, Transition::Started)
+    }
+
+    /// Returns `true` if the current [`Behavior`] was just resumed.
+    pub fn is_resumed(&self) -> bool {
+        matches!(self.transition, Transition::Resumed)
+    }
+
+    /// Returns `true` if the current [`Behavior`] is active and not in a transition.
+    pub fn is_stable(&self) -> bool {
+        matches!(self.transition, Transition::Stable)
+    }
+
     /// Returns a reference to the current [`Behavior`] if it was changed since last query.
     pub fn get_changed(&self) -> Option<&B> {
         self.is_changed().then(|| self.get())
@@ -242,7 +267,8 @@ impl<B: Behavior> BehaviorMutReadOnlyItem<'_, B> {
 
     /// Returns `true` if a [`Transition`] is currently in progress.
     pub fn has_transition(&self) -> bool {
-        !matches!(self.transition, Transition::Empty)
+        use Transition::*;
+        !matches!(self.transition, Stable | Started | Resumed)
     }
 
     /// Returns a reference to the previous [`Behavior`], if it exists.
@@ -286,6 +312,21 @@ impl<B: Behavior> BehaviorMutItem<'_, B> {
         self.behavior.is_changed()
     }
 
+    /// Returns `true` if the current [`Behavior`] was just started.
+    pub fn is_started(&self) -> bool {
+        matches!(*self.transition, Transition::Started)
+    }
+
+    /// Returns `true` if the current [`Behavior`] was just resumed.
+    pub fn is_resumed(&self) -> bool {
+        matches!(*self.transition, Transition::Resumed)
+    }
+
+    /// Returns `true` if the current [`Behavior`] is active and not in a transition.
+    pub fn is_stable(&self) -> bool {
+        matches!(*self.transition, Transition::Stable)
+    }
+
     /// Returns a reference to the current [`Behavior`] if it was changed since last query.
     pub fn get_changed(&self) -> Option<&B> {
         self.is_changed().then(|| self.get())
@@ -298,7 +339,8 @@ impl<B: Behavior> BehaviorMutItem<'_, B> {
 
     /// Returns `true` if a [`Transition`] is currently in progress.
     pub fn has_transition(&self) -> bool {
-        !matches!(*self.transition, Transition::Empty)
+        use Transition::*;
+        !matches!(*self.transition, Stable | Started | Resumed)
     }
 
     /// Tries to start the given [`Behavior`] as the next one.
@@ -309,7 +351,7 @@ impl<B: Behavior> BehaviorMutItem<'_, B> {
     pub fn try_start(&mut self, next: B) -> Future<TransitionResult<B>> {
         let (transition, future) = Transition::next(next);
         let previous = replace(self.transition.as_mut(), transition);
-        if !matches!(previous, Transition::Empty) {
+        if !matches!(previous, Transition::Stable) {
             warn!(
                 "transition override: {previous:?} -> {:?}",
                 self.transition.as_ref(),
@@ -326,7 +368,7 @@ impl<B: Behavior> BehaviorMutItem<'_, B> {
     /// If the current behavior is the initial one, it does nothing.
     pub fn stop(&mut self) {
         let previous = replace(self.transition.as_mut(), Transition::previous());
-        if !matches!(previous, Transition::Empty) {
+        if !matches!(previous, Transition::Stable) {
             warn!(
                 "transition override: {previous:?} -> {:?}",
                 self.transition.as_ref(),
@@ -339,7 +381,7 @@ impl<B: Behavior> BehaviorMutItem<'_, B> {
     /// If the current behavior is the initial one, it does nothing.
     pub fn reset(&mut self) {
         let previous = replace(self.transition.as_mut(), Transition::reset());
-        if !matches!(previous, Transition::Empty) {
+        if !matches!(previous, Transition::Stable) {
             warn!(
                 "transition override: {previous:?} -> {:?}",
                 self.transition.as_ref(),
@@ -440,7 +482,9 @@ impl<B: Behavior> Default for Memory<B> {
 #[reflect(Component)]
 pub enum Transition<B: Behavior> {
     #[default]
-    Empty,
+    Stable,
+    Started,
+    Resumed,
     #[reflect(ignore)]
     Next(B, #[reflect(ignore)] Promise<TransitionResult<B>>),
     #[reflect(ignore)]
@@ -465,9 +509,24 @@ impl<B: Behavior> Transition<B> {
     }
 
     fn take(&mut self) -> Self {
-        let mut t = Self::Empty;
+        let mut t = Self::Stable;
         swap(self, &mut t);
         t
+    }
+
+    fn clone(&self) -> Self
+    where
+        B: Clone,
+    {
+        use Transition::*;
+        match self {
+            Stable => Stable,
+            Started => Started,
+            Resumed => Resumed,
+            Next(next, _) => Next(next.clone(), Promise::new()),
+            Previous => Previous,
+            Reset => Reset,
+        }
     }
 }
 
@@ -475,7 +534,9 @@ impl<B: Behavior> Debug for Transition<B> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         use Transition::*;
         match self {
-            Empty => write!(f, "None"),
+            Stable => write!(f, "Stable"),
+            Started => write!(f, "Started"),
+            Resumed => write!(f, "Resumed"),
             Next(arg0, _) => f.debug_tuple("Next").field(arg0).finish(),
             Previous => write!(f, "Previous"),
             Reset => write!(f, "Reset"),
@@ -616,19 +677,39 @@ pub type Stopped<'w, 's, B> = EventReader<'w, 's, StoppedEvent<B>>;
 /// A [`System`] which triggers [`Behavior`] transitions.
 #[allow(clippy::type_complexity)]
 pub fn transition<B: Behavior>(
-    mut query: Query<(Entity, &mut B, &mut Memory<B>, &mut Transition<B>), Changed<Transition<B>>>,
+    mut query: Query<(Entity, &mut B, &mut Memory<B>, &mut Transition<B>)>,
     mut events: Events<B>,
 ) {
     for (entity, current, memory, mut transition) in &mut query {
         use Transition::*;
-        match transition.bypass_change_detection().take() {
+
+        // Do not mutate the transition if stable:
+        if matches!(*transition, Stable) {
+            continue;
+        }
+
+        match transition.take() {
             Next(next, promise) => {
                 let value = push(entity, next, current, memory, &mut events);
+                if value.is_ok() {
+                    *transition = Started;
+                }
                 promise.set(value);
             }
-            Previous => pop(entity, current, memory, &mut events),
-            Reset => reset(entity, current, memory, &mut events),
-            Empty => {}
+            Previous => {
+                if pop(entity, current, memory, &mut events) {
+                    *transition = Resumed;
+                }
+            }
+            Reset => {
+                if reset(entity, current, memory, &mut events) {
+                    *transition = Resumed;
+                }
+            }
+            Started | Resumed => {
+                *transition = Stable;
+            }
+            Stable => unreachable!(),
         }
     }
 }
@@ -665,7 +746,7 @@ fn pop<B: Behavior>(
     mut current: Mut<B>,
     mut memory: Mut<Memory<B>>,
     events: &mut Events<B>,
-) {
+) -> bool {
     if let Some(mut next) = memory.pop() {
         debug!("{entity:?}: {:?} -> {next:?}", *current);
         let behavior = {
@@ -674,8 +755,10 @@ fn pop<B: Behavior>(
         };
         events.send_resumed(entity);
         events.send_stopped(entity, behavior);
+        true
     } else {
         error!("{entity:?}: {:?} -> None is not allowed", *current);
+        false
     }
 }
 
@@ -684,7 +767,7 @@ fn reset<B: Behavior>(
     mut current: Mut<B>,
     mut memory: Mut<Memory<B>>,
     events: &mut Events<B>,
-) {
+) -> bool {
     while memory.len() > 1 {
         let behavior = memory.pop().unwrap();
         events.send_stopped(entity, behavior);
@@ -698,7 +781,9 @@ fn reset<B: Behavior>(
         };
         events.send_resumed(entity);
         events.send_stopped(entity, behavior);
+        true
     } else {
         warn!("{entity:?}: {:?} -> {:?} is redundant", *current, *current);
+        false
     }
 }
