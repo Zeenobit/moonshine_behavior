@@ -102,7 +102,12 @@ pub fn transition<B: Behavior>(
                 promise.set(value);
             }
             Previous => {
-                if pop(entity, current, memory, &mut events) {
+                if let Some(next) = current.sequence() {
+                    let value = push(entity, next, current, memory, &mut events);
+                    if value.is_ok() {
+                        *transition = Started;
+                    }
+                } else if pop(entity, current, memory, &mut events) {
                     *transition = Resumed;
                 }
             }

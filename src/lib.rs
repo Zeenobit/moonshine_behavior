@@ -94,7 +94,7 @@ impl<B: Behavior + FromReflect + TypePath + GetTypeRegistration> Plugin for Beha
 ///     matches!(*behavior, Chirp) && matches!(behavior.previous(), Some(Fly))
 /// }
 /// ```
-pub trait Behavior: Component + Debug {
+pub trait Behavior: Component + Debug + Sized {
     /// Returns `true` if some next [`Behavior`] is allowed to be started after this one.
     ///
     /// By default, any behavior is allowed to start after any other behavior.
@@ -107,6 +107,16 @@ pub trait Behavior: Component + Debug {
     /// By default, all behaviors are resumable.
     fn is_resumable(&self) -> bool {
         true
+    }
+
+    /// This method is called when the current [`Behavior`] is stopped.
+    ///
+    /// By default, it does nothing.
+    /// Optionally, it may return the next [`Behavior`] to start immediately after this one.
+    ///
+    /// This allows you to create a chain of behaviors that execute in sequence.
+    fn sequence(&self) -> Option<Self> {
+        None
     }
 }
 

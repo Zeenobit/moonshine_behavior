@@ -8,13 +8,21 @@ enum B {
     S0,
     S1,
     S2,
+    S3,
 }
 
 use B::*;
 
 impl Behavior for B {
     fn allows_next(&self, next: &Self) -> bool {
-        !matches!((self, next), (S0, S2))
+        matches!((self, next), (S0, S1) | (S1, S2) | (S2, S3))
+    }
+
+    fn sequence(&self) -> Option<Self> {
+        match self {
+            S2 => Some(S3),
+            _ => None,
+        }
     }
 }
 
@@ -125,4 +133,46 @@ fn reset() {
     assert!(a
         .world_mut()
         .run_system_once(|q: Query<BehaviorRef<B>>| { q.single().is_stable() }));
+}
+
+#[test]
+fn chain() {
+    let mut a = app();
+    let e = a.world_mut().spawn(BehaviorBundle::new(S0)).id();
+    let _ = a
+        .world_mut()
+        .run_system_once(|mut q: Query<BehaviorMut<B>>| q.single_mut().try_start(S1));
+    a.update();
+
+    let _ = a
+        .world_mut()
+        .run_system_once(|mut q: Query<BehaviorMut<B>>| q.single_mut().try_start(S2));
+    a.update();
+    assert_eq!(*a.world().get::<B>(e).unwrap(), S2);
+
+    a.world_mut()
+        .run_system_once(|mut q: Query<BehaviorMut<B>>| {
+            q.single_mut().stop();
+        });
+    a.update();
+    assert_eq!(*a.world().get::<B>(e).unwrap(), S3);
+    assert!(a
+        .world_mut()
+        .run_system_once(|q: Query<BehaviorRef<B>>| { q.single().is_started() }));
+
+    a.update();
+    assert_eq!(*a.world().get::<B>(e).unwrap(), S3);
+    assert!(a
+        .world_mut()
+        .run_system_once(|q: Query<BehaviorRef<B>>| { q.single().is_stable() }));
+
+    a.world_mut()
+        .run_system_once(|mut q: Query<BehaviorMut<B>>| {
+            q.single_mut().stop();
+        });
+    a.update();
+    assert_eq!(*a.world().get::<B>(e).unwrap(), S2);
+    assert!(a
+        .world_mut()
+        .run_system_once(|q: Query<BehaviorRef<B>>| { q.single().is_resumed() }));
 }
