@@ -109,13 +109,17 @@ pub trait Behavior: Component + Debug + Sized {
         true
     }
 
+    fn started(&self) -> Option<Self> {
+        None
+    }
+
     /// This method is called when the current [`Behavior`] is stopped.
     ///
     /// By default, it does nothing.
     /// Optionally, it may return the next [`Behavior`] to start immediately after this one.
     ///
     /// This allows you to create a chain of behaviors that execute in sequence.
-    fn sequence(&self) -> Option<Self> {
+    fn stopped(&self) -> Option<Self> {
         None
     }
 }

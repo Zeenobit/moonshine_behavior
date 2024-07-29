@@ -18,7 +18,7 @@ impl Behavior for B {
         matches!((self, next), (S0, S1) | (S1, S2) | (S2, S3))
     }
 
-    fn sequence(&self) -> Option<Self> {
+    fn stopped(&self) -> Option<Self> {
         match self {
             S2 => Some(S3),
             _ => None,

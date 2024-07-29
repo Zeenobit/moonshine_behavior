@@ -85,7 +85,7 @@ pub fn transition<B: Behavior>(
     mut query: Query<(Entity, &mut B, &mut Memory<B>, &mut Transition<B>)>,
     mut events: BehaviorEvents<B>,
 ) {
-    for (entity, current, memory, mut transition) in &mut query {
+    for (entity, mut current, memory, mut transition) in &mut query {
         use Transition::*;
 
         // Do not mutate the transition if stable:
@@ -95,15 +95,19 @@ pub fn transition<B: Behavior>(
 
         match transition.take() {
             Next(next, promise) => {
-                let value = push(entity, next, current, memory, &mut events);
+                let value = push(entity, next, &mut current, memory, &mut events);
                 if value.is_ok() {
-                    *transition = Started;
+                    if let Some(next) = current.started() {
+                        *transition = Next(next, Promise::new());
+                    } else {
+                        *transition = Started;
+                    }
                 }
                 promise.set(value);
             }
             Previous => {
-                if let Some(next) = current.sequence() {
-                    let value = push(entity, next, current, memory, &mut events);
+                if let Some(next) = current.stopped() {
+                    let value = push(entity, next, &mut current, memory, &mut events);
                     if value.is_ok() {
                         *transition = Started;
                     }
@@ -127,7 +131,7 @@ pub fn transition<B: Behavior>(
 fn push<B: Behavior>(
     entity: Entity,
     mut next: B,
-    mut current: Mut<B>,
+    current: &mut Mut<B>,
     mut memory: Mut<Memory<B>>,
     events: &mut BehaviorEvents<B>,
 ) -> TransitionResult<B> {
