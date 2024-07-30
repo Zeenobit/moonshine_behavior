@@ -136,7 +136,7 @@ fn push<B: Behavior>(
     events: &mut BehaviorEvents<B>,
 ) -> TransitionResult<B> {
     if current.allows_next(&next) {
-        debug!("{entity:?}: {:?} -> {next:?}", *current);
+        debug!("{entity:?}: {:?} -> {next:?}", *current.as_ref());
         let behavior = {
             mem::swap(current.as_mut(), &mut next);
             next
@@ -150,7 +150,10 @@ fn push<B: Behavior>(
         events.send_started(entity);
         Ok(())
     } else {
-        warn!("{entity:?}: {:?} -> {next:?} is not allowed", *current);
+        warn!(
+            "{entity:?}: {:?} -> {next:?} is not allowed",
+            *current.as_ref()
+        );
         Err(InvalidTransition(next))
     }
 }
@@ -162,7 +165,7 @@ fn pop<B: Behavior>(
     events: &mut BehaviorEvents<B>,
 ) -> bool {
     if let Some(mut next) = memory.pop() {
-        debug!("{entity:?}: {:?} -> {next:?}", *current);
+        debug!("{entity:?}: {:?} -> {next:?}", *current.as_ref());
         let behavior = {
             mem::swap(current.as_mut(), &mut next);
             next
@@ -171,7 +174,7 @@ fn pop<B: Behavior>(
         events.send_stopped(entity, behavior);
         true
     } else {
-        error!("{entity:?}: {:?} -> None is not allowed", *current);
+        error!("{entity:?}: {:?} -> None is not allowed", *current.as_ref());
         false
     }
 }
@@ -188,7 +191,7 @@ fn reset<B: Behavior>(
     }
 
     if let Some(mut next) = memory.pop() {
-        debug!("{entity:?}: {:?} -> {next:?}", *current);
+        debug!("{entity:?}: {:?} -> {next:?}", *current.as_ref());
         let behavior = {
             mem::swap(current.as_mut(), &mut next);
             next
@@ -197,7 +200,11 @@ fn reset<B: Behavior>(
         events.send_stopped(entity, behavior);
         true
     } else {
-        warn!("{entity:?}: {:?} -> {:?} is redundant", *current, *current);
+        warn!(
+            "{entity:?}: {:?} -> {:?} is redundant",
+            *current.as_ref(),
+            *current.as_ref()
+        );
         false
     }
 }
