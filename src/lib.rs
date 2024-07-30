@@ -388,8 +388,9 @@ impl<B: Behavior> BehaviorMutItem<'_, B> {
     ///
     /// If the current behavior is the initial one, it does nothing.
     pub fn stop(&mut self) {
+        let had_transition = self.has_transition();
         let previous = replace(self.transition.as_mut(), Transition::previous());
-        if !matches!(previous, Transition::Stable) {
+        if had_transition {
             warn!(
                 "transition override: {previous:?} -> {:?}",
                 self.transition.as_ref(),
@@ -401,8 +402,9 @@ impl<B: Behavior> BehaviorMutItem<'_, B> {
     ///
     /// If the current behavior is the initial one, it does nothing.
     pub fn reset(&mut self) {
+        let had_transition = self.has_transition();
         let previous = replace(self.transition.as_mut(), Transition::reset());
-        if !matches!(previous, Transition::Stable) {
+        if had_transition {
             warn!(
                 "transition override: {previous:?} -> {:?}",
                 self.transition.as_ref(),
