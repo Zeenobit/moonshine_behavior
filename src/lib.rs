@@ -7,7 +7,7 @@ use std::{
 };
 
 use bevy_app::{App, Plugin};
-use bevy_ecs::{prelude::*, query::QueryData};
+use bevy_ecs::{component::Tick, prelude::*, query::QueryData};
 use bevy_reflect::{FromReflect, GetTypeRegistration, TypePath};
 use bevy_utils::tracing::warn;
 use moonshine_util::future::Future;
@@ -245,6 +245,20 @@ impl<B: Behavior> Borrow<B> for BehaviorRefItem<'_, B> {
     }
 }
 
+impl<B: Behavior> DetectChanges for BehaviorRefItem<'_, B> {
+    fn is_added(&self) -> bool {
+        self.behavior.is_added()
+    }
+
+    fn is_changed(&self) -> bool {
+        self.behavior.is_changed()
+    }
+
+    fn last_changed(&self) -> Tick {
+        self.behavior.last_changed()
+    }
+}
+
 /// A mutable [`QueryData`] used to query and manipulate a [`Behavior`].
 #[derive(QueryData)]
 #[query_data(mutable)]
@@ -313,6 +327,20 @@ impl<B: Behavior> Deref for BehaviorMutReadOnlyItem<'_, B> {
 impl<B: Behavior> Borrow<B> for BehaviorMutReadOnlyItem<'_, B> {
     fn borrow(&self) -> &B {
         &self.behavior
+    }
+}
+
+impl<B: Behavior> DetectChanges for BehaviorMutReadOnlyItem<'_, B> {
+    fn is_added(&self) -> bool {
+        self.behavior.is_added()
+    }
+
+    fn is_changed(&self) -> bool {
+        self.behavior.is_changed()
+    }
+
+    fn last_changed(&self) -> Tick {
+        self.behavior.last_changed()
     }
 }
 
@@ -446,6 +474,36 @@ impl<B: Behavior> Borrow<B> for BehaviorMutItem<'_, B> {
 impl<B: Behavior> BorrowMut<B> for BehaviorMutItem<'_, B> {
     fn borrow_mut(&mut self) -> &mut B {
         self.behavior.as_mut()
+    }
+}
+
+impl<B: Behavior> DetectChanges for BehaviorMutItem<'_, B> {
+    fn is_added(&self) -> bool {
+        self.behavior.is_added()
+    }
+
+    fn is_changed(&self) -> bool {
+        self.behavior.is_changed()
+    }
+
+    fn last_changed(&self) -> Tick {
+        self.behavior.last_changed()
+    }
+}
+
+impl<B: Behavior> DetectChangesMut for BehaviorMutItem<'_, B> {
+    type Inner = B;
+
+    fn set_changed(&mut self) {
+        self.behavior.set_changed();
+    }
+
+    fn set_last_changed(&mut self, last_changed: Tick) {
+        self.behavior.set_last_changed(last_changed);
+    }
+
+    fn bypass_change_detection(&mut self) -> &mut Self::Inner {
+        self.behavior.bypass_change_detection()
     }
 }
 
