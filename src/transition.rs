@@ -151,7 +151,7 @@ fn push<B: Behavior>(
         Ok(())
     } else {
         warn!(
-            "{entity:?}: {:?} -> {next:?} is not allowed",
+            "{entity}: {:?} -> {next:?} is not allowed",
             *current.as_ref()
         );
         Err(InvalidTransition(next))
@@ -174,7 +174,7 @@ fn pop<B: Behavior>(
         events.send_stopped(entity, behavior);
         true
     } else {
-        error!("{entity:?}: {:?} -> None is not allowed", *current.as_ref());
+        error!("{entity}: {:?} -> None is not allowed", *current.as_ref());
         false
     }
 }
@@ -201,7 +201,7 @@ fn reset<B: Behavior>(
         true
     } else {
         warn!(
-            "{entity:?}: {:?} -> {:?} is redundant",
+            "{entity}: {:?} -> {:?} is redundant",
             *current.as_ref(),
             *current.as_ref()
         );
