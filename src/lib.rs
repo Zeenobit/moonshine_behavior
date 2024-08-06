@@ -189,14 +189,9 @@ impl<B: Behavior> BehaviorRefItem<'_, B> {
         &self.behavior
     }
 
-    /// Returns `true` if the current [`Behavior`] was changed since last query.
-    pub fn is_changed(&self) -> bool {
-        self.behavior.is_changed()
-    }
-
     /// Returns `true` if the current [`Behavior`] was just started.
     pub fn is_started(&self) -> bool {
-        matches!(self.transition, Transition::Started)
+        matches!(self.transition, Transition::Started) || self.is_added()
     }
 
     /// Returns `true` if the current [`Behavior`] was just resumed.
@@ -274,14 +269,9 @@ impl<B: Behavior> BehaviorMutReadOnlyItem<'_, B> {
         &self.behavior
     }
 
-    /// Returns `true` if the current [`Behavior`] was changed since last query.
-    pub fn is_changed(&self) -> bool {
-        self.behavior.is_changed()
-    }
-
     /// Returns `true` if the current [`Behavior`] was just started.
     pub fn is_started(&self) -> bool {
-        matches!(self.transition, Transition::Started)
+        matches!(self.transition, Transition::Started) || self.is_added()
     }
 
     /// Returns `true` if the current [`Behavior`] was just resumed.
@@ -355,14 +345,9 @@ impl<B: Behavior> BehaviorMutItem<'_, B> {
         &mut self.behavior
     }
 
-    /// Returns `true` if the current [`Behavior`] was changed since last query.
-    pub fn is_changed(&self) -> bool {
-        self.behavior.is_changed()
-    }
-
     /// Returns `true` if the current [`Behavior`] was just started.
     pub fn is_started(&self) -> bool {
-        matches!(*self.transition, Transition::Started)
+        matches!(*self.transition, Transition::Started) || self.is_added()
     }
 
     /// Returns `true` if the current [`Behavior`] was just resumed.
