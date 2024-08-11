@@ -10,11 +10,11 @@ use bevy_app::{App, Plugin};
 use bevy_ecs::{component::Tick, prelude::*, query::QueryData};
 use bevy_reflect::{FromReflect, GetTypeRegistration, TypePath};
 use bevy_utils::tracing::warn;
-use moonshine_util::future::Future;
+use moonshine_util::{app::FnPlugin, future::Future};
 
 pub mod prelude {
     pub use crate::{
-        BehaviorPlugin, {transition, InvalidTransition, TransitionResult},
+        behavior_plugin, BehaviorPlugin, {transition, InvalidTransition, TransitionResult},
         {Behavior, BehaviorBundle}, {BehaviorMut, BehaviorRef},
         {Paused, Resumed, Started, Stopped},
         {PausedEvent, ResumedEvent, StartedEvent, StoppedEvent},
@@ -24,17 +24,8 @@ pub mod prelude {
 #[cfg(test)]
 mod tests;
 
-/// A [`Plugin`] which registers a [`Behavior`] type with its [`App`].
-pub struct BehaviorPlugin<B: Behavior>(PhantomData<B>);
-
-impl<B: Behavior> Default for BehaviorPlugin<B> {
-    fn default() -> Self {
-        Self(PhantomData)
-    }
-}
-
-impl<B: Behavior + FromReflect + TypePath + GetTypeRegistration> Plugin for BehaviorPlugin<B> {
-    fn build(&self, app: &mut App) {
+pub fn behavior_plugin<B: RegisterableBehavior>() -> impl FnPlugin {
+    |app| {
         app.add_event::<StartedEvent<B>>()
             .add_event::<PausedEvent<B>>()
             .add_event::<ResumedEvent<B>>()
@@ -42,6 +33,21 @@ impl<B: Behavior + FromReflect + TypePath + GetTypeRegistration> Plugin for Beha
             .register_type::<Memory<B>>()
             .register_type::<Vec<B>>()
             .register_type::<Transition<B>>();
+    }
+}
+
+/// A [`Plugin`] which registers a [`Behavior`] type with its [`App`].
+pub struct BehaviorPlugin<B: RegisterableBehavior>(PhantomData<B>);
+
+impl<B: RegisterableBehavior> Default for BehaviorPlugin<B> {
+    fn default() -> Self {
+        Self(PhantomData)
+    }
+}
+
+impl<B: RegisterableBehavior> Plugin for BehaviorPlugin<B> {
+    fn build(&self, app: &mut App) {
+        behavior_plugin::<B>()(app);
     }
 }
 
@@ -129,6 +135,10 @@ pub trait Behavior: Component + Debug + Sized {
         None
     }
 }
+
+pub trait RegisterableBehavior: Behavior + FromReflect + TypePath + GetTypeRegistration {}
+
+impl<B: Behavior + FromReflect + TypePath + GetTypeRegistration> RegisterableBehavior for B {}
 
 /// A [`Bundle`] which contains a [`Behavior`] and other required components for it to function.
 #[derive(Bundle, Default)]
