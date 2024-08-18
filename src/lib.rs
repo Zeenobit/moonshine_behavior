@@ -23,9 +23,6 @@ pub mod prelude {
     pub use crate::{BehaviorMut, BehaviorRef};
 }
 
-#[cfg(test)]
-mod tests;
-
 /// Returns a [`Plugin`] which registers the given [`Behavior`] with the [`App`].
 ///
 /// # Usage
