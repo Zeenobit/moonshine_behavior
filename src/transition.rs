@@ -44,39 +44,40 @@ impl<B: Behavior> Transition<B> {
         matches!(self, Self::Stable)
     }
 
+    pub fn is_activated(&self) -> bool {
+        self.is_started() || self.is_resumed()
+    }
+
     pub fn is_suspending(&self) -> bool {
         matches!(self, Self::Next { .. } | Self::Previous | Self::Reset)
     }
 
     pub fn try_start(&mut self, behavior: B) -> Future<TransitionResult<B>> {
-        let was_suspending = self.is_suspending();
-        let (next, future) = Self::next(behavior);
-        let old = std::mem::replace(self, next);
-        if was_suspending {
+        let (new, future) = Self::next(behavior);
+        let old = mem::replace(self, new);
+        if old.is_suspending() {
             warn!("transition override: {old:?} -> {self:?}");
         }
         future
     }
 
     pub fn stop(&mut self) {
-        let was_suspending = self.is_suspending();
-        let old = std::mem::replace(self, Self::Previous);
-        if was_suspending {
+        let old = mem::replace(self, Self::Previous);
+        if old.is_suspending() {
             warn!("transition override: {old:?} -> {self:?}");
         }
     }
 
     pub fn reset(&mut self) {
-        let was_suspending = self.is_suspending();
-        let old = std::mem::replace(self, Self::Reset);
-        if was_suspending {
+        let old = mem::replace(self, Self::Reset);
+        if old.is_suspending() {
             warn!("transition override: {old:?} -> {self:?}");
         }
     }
 
     fn take(&mut self) -> Self {
         let mut t = Self::Stable;
-        std::mem::swap(self, &mut t);
+        mem::swap(self, &mut t);
         t
     }
 
@@ -130,15 +131,15 @@ pub fn transition<B: Behavior>(
 
         match transition.take() {
             Next(next, promise) => {
-                let value = push(&mut current, next, memory, &mut events);
-                if value.is_ok() {
+                let result = push(&mut current, next, memory, &mut events);
+                if result.is_ok() {
                     if let Some(next) = current.started() {
                         *transition = Next(next, Promise::new());
                     } else {
                         *transition = Started;
                     }
                 }
-                promise.set(value);
+                promise.set(result);
             }
             Previous => {
                 if let Some(next) = current.stopped() {
