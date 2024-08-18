@@ -68,10 +68,8 @@ pub fn behavior_events_plugin<B: Behavior>() -> impl Plugin {
 
 /// A [`Component`] which represents some state of its [`Entity`].
 ///
-/// # Usage
-/// A [`Behavior`] is typically implemented as an `enum` type.
-///
 /// # Example
+/// Typically, a behavior is implemented as an `enum` type, which acts like a single state within a state machine:
 /// ```
 /// use bevy::prelude::*;
 /// use moonshine_behavior::prelude::*;
@@ -83,36 +81,79 @@ pub fn behavior_events_plugin<B: Behavior>() -> impl Plugin {
 ///     Idle,
 ///     Fly,
 ///     Sleep,
-///     Chirp,
+///     Chirp
 /// }
-///
-/// use Bird::*;
 ///
 /// impl Behavior for Bird {
 ///     fn allows_next(&self, next: &Self) -> bool {
-///         match self {
-///             Idle => matches!(next, Sleep | Fly | Chirp),
+///         use Bird::*;
+///         match (self, next) {
+///             // Bird may Fly or Sleep when Idle:
+///             Idle => matches!(next, Fly | Sleep),
+///             // Bird may Chirp when Flying:
 ///             Fly => matches!(next, Chirp),
-///             Sleep | Chirp => false,
+///             // Bird must not do anything else if Sleeping or Chirping:
+///             _ => false,
 ///         }
 ///     }
+/// }
+/// ```
+/// However, a behavior can also be any struct type:
+/// ```
+/// # use bevy::prelude::*;
+/// # use moonshine_behavior::prelude::*;
 ///
-///     fn is_resumable(&self) -> bool {
-///         matches!(self, Idle | Fly)
+/// #[derive(Component, Default, Debug, Reflect)]
+/// #[reflect(Component)]
+/// struct Bird {
+///     fly: bool,
+///     sleep: bool,
+///     chirp: bool,
+/// }
+///
+/// impl Behavior for Bird {
+///     fn allows_next(&self, next: &Self) -> bool {
+///         if self.sleep || self.chirp {
+///             // Bird must not do anything else if Sleeping or Chirping:
+///             false
+///         } else if self.fly {
+///             // Bird may Chirp when Flying:
+///             next.chirp
+///         } else {
+///             // Bird may Fly or Sleep when Idle:
+///             next.fly || next.sleep
+///         }
 ///     }
 /// }
+/// ```
+/// You can also combine nested enums and structs to create complex state machines:
+/// ```
+/// use std::time::Duration;
 ///
-/// fn spawn_bird(mut commands: Commands) {
-///     commands.spawn(BehaviorBundle::<Bird>::default());
+/// use bevy::prelude::*;
+/// use moonshine_behavior::prelude::*;
+///
+/// #[derive(Component, Default, Debug, Reflect)]
+/// #[reflect(Component)]
+/// enum Bird {
+///     #[default]
+///     Idle(Wait),
+///     Fly(WingState),
+///     Sleep(Wait),
+///     Chirp,
 /// }
 ///
-/// fn chirp(mut bird: Query<BehaviorMut<Bird>>) {
-///     bird.single_mut().try_start(Chirp);
+/// #[derive(Default, Debug, Reflect)]
+/// struct Wait(Duration);
+///
+/// #[derive(Default, Debug, Reflect)]
+/// enum WingState {
+///     Up,
+///     Down,
 /// }
 ///
-/// fn is_chirping_while_flying(bird: Query<BehaviorRef<Bird>>) -> bool {
-///     let behavior = bird.single();
-///     matches!(*behavior, Chirp) && matches!(behavior.previous(), Some(Fly))
+/// impl Behavior for Bird {
+///     /* ... */
 /// }
 /// ```
 pub trait Behavior: Component + Debug + Sized {
@@ -151,6 +192,7 @@ pub trait Behavior: Component + Debug + Sized {
     }
 }
 
+#[doc(hidden)]
 pub trait RegisterableBehavior: Behavior + FromReflect + TypePath + GetTypeRegistration {}
 
 impl<B: Behavior + FromReflect + TypePath + GetTypeRegistration> RegisterableBehavior for B {}
