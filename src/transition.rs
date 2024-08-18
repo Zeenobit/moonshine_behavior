@@ -13,8 +13,8 @@ use crate::{Behavior, BehaviorEventWriter, Memory};
 #[derive(Component, Default, Reflect)]
 #[reflect(Component)]
 pub enum Transition<B: Behavior> {
-    #[default]
     Stable,
+    #[default]
     Started,
     Resumed,
     #[reflect(ignore)]

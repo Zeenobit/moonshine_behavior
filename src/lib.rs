@@ -257,10 +257,7 @@ impl<B: Behavior> BehaviorRefItem<'_, B> {
     }
 
     /// Returns `true` if the current [`Behavior`] was just started.
-    #[deprecated(
-        since = "0.1.5",
-        note = "use `Transition::<B>::is_started` instead; check `Added<B>` to handle initialization."
-    )]
+    #[deprecated(since = "0.1.5", note = "use `Transition::<B>::is_started` instead")]
     pub fn is_started(&self) -> bool {
         self.transition.is_started() || self.is_added()
     }
@@ -350,10 +347,7 @@ impl<B: Behavior> BehaviorMutReadOnlyItem<'_, B> {
     }
 
     /// Returns `true` if the current [`Behavior`] was just started.
-    #[deprecated(
-        since = "0.1.5",
-        note = "use `Transition::<B>::is_started` instead; check `Added<B>` to handle initialization."
-    )]
+    #[deprecated(since = "0.1.5", note = "use `Transition::<B>::is_started` instead")]
     pub fn is_started(&self) -> bool {
         self.transition.is_started() || self.is_added()
     }
@@ -437,10 +431,7 @@ impl<B: Behavior> BehaviorMutItem<'_, B> {
     }
 
     /// Returns `true` if the current [`Behavior`] was just started.
-    #[deprecated(
-        since = "0.1.5",
-        note = "use `Transition::<B>::is_started` instead; check `Added<B>` to handle initialization."
-    )]
+    #[deprecated(since = "0.1.5", note = "use `Transition::<B>::is_started` instead")]
     pub fn is_started(&self) -> bool {
         self.transition.is_started() || self.is_added()
     }
