@@ -63,10 +63,6 @@ impl<B: Behavior> ResumedEvent<B> {
     pub fn entity(&self) -> Entity {
         self.instance.entity()
     }
-
-    pub fn instance(&self) -> &Instance<B> {
-        &self.instance
-    }
 }
 
 /// An event emitted when a [`Behavior`] is paused.
@@ -93,11 +89,6 @@ impl<B: Behavior> StoppedEvent<B> {
     /// Returns the [`Entity`] that stopped the [`Behavior`].
     pub fn entity(&self) -> Entity {
         self.instance.entity()
-    }
-
-    /// Returns the [`Behavior`] that was stopped.
-    pub fn behavior(&self) -> &B {
-        &self.behavior
     }
 }
 
