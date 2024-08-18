@@ -30,12 +30,46 @@ impl<B: Behavior> Transition<B> {
         (transition, future)
     }
 
-    pub fn previous() -> Self {
-        Self::Previous
+    pub fn is_started(&self) -> bool {
+        matches!(self, Self::Started)
     }
 
-    pub fn reset() -> Self {
-        Self::Reset
+    pub fn is_resumed(&self) -> bool {
+        matches!(self, Self::Resumed)
+    }
+
+    pub fn is_stable(&self) -> bool {
+        matches!(self, Self::Stable)
+    }
+
+    pub fn is_suspending(&self) -> bool {
+        matches!(self, Self::Next { .. } | Self::Previous | Self::Reset)
+    }
+
+    pub fn try_start(&mut self, behavior: B) -> Future<TransitionResult<B>> {
+        let was_suspending = self.is_suspending();
+        let (next, future) = Self::next(behavior);
+        let old = std::mem::replace(self, next);
+        if was_suspending {
+            warn!("transition override: {old:?} -> {self:?}");
+        }
+        future
+    }
+
+    pub fn stop(&mut self) {
+        let was_suspending = self.is_suspending();
+        let old = std::mem::replace(self, Self::Previous);
+        if was_suspending {
+            warn!("transition override: {old:?} -> {self:?}");
+        }
+    }
+
+    pub fn reset(&mut self) {
+        let was_suspending = self.is_suspending();
+        let old = std::mem::replace(self, Self::Reset);
+        if was_suspending {
+            warn!("transition override: {old:?} -> {self:?}");
+        }
     }
 
     fn take(&mut self) -> Self {

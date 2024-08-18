@@ -3,14 +3,12 @@
 use std::{
     borrow::{Borrow, BorrowMut},
     fmt::Debug,
-    mem::replace,
     ops::{Deref, DerefMut},
 };
 
 use bevy_app::{App, Plugin};
 use bevy_ecs::{component::Tick, prelude::*, query::QueryData};
 use bevy_reflect::{FromReflect, GetTypeRegistration, TypePath};
-use bevy_utils::tracing::warn;
 use moonshine_util::future::Future;
 
 pub mod prelude {
@@ -338,17 +336,17 @@ impl<B: Behavior> BehaviorMutReadOnlyItem<'_, B> {
 
     /// Returns `true` if the current [`Behavior`] was just started.
     pub fn is_started(&self) -> bool {
-        matches!(self.transition, Transition::Started) || self.is_added()
+        self.transition.is_started() || self.is_added()
     }
 
     /// Returns `true` if the current [`Behavior`] was just resumed.
     pub fn is_resumed(&self) -> bool {
-        matches!(self.transition, Transition::Resumed)
+        self.transition.is_resumed()
     }
 
     /// Returns `true` if the current [`Behavior`] is active and not in a transition.
     pub fn is_stable(&self) -> bool {
-        matches!(self.transition, Transition::Stable)
+        self.transition.is_stable()
     }
 
     /// Returns a reference to the current [`Behavior`] if it was changed since last query.
@@ -358,8 +356,7 @@ impl<B: Behavior> BehaviorMutReadOnlyItem<'_, B> {
 
     /// Returns `true` if a [`Transition`] is currently in progress.
     pub fn has_transition(&self) -> bool {
-        use Transition::*;
-        !matches!(self.transition, Stable | Started | Resumed)
+        self.transition.is_suspending()
     }
 
     /// Returns a reference to the previous [`Behavior`], if it exists.
@@ -414,17 +411,17 @@ impl<B: Behavior> BehaviorMutItem<'_, B> {
 
     /// Returns `true` if the current [`Behavior`] was just started.
     pub fn is_started(&self) -> bool {
-        matches!(*self.transition, Transition::Started) || self.is_added()
+        self.transition.is_started() || self.is_added()
     }
 
     /// Returns `true` if the current [`Behavior`] was just resumed.
     pub fn is_resumed(&self) -> bool {
-        matches!(*self.transition, Transition::Resumed)
+        self.transition.is_resumed()
     }
 
     /// Returns `true` if the current [`Behavior`] is active and not in a transition.
     pub fn is_stable(&self) -> bool {
-        matches!(*self.transition, Transition::Stable)
+        self.transition.is_stable()
     }
 
     /// Returns a reference to the current [`Behavior`] if it was changed since last query.
@@ -439,8 +436,7 @@ impl<B: Behavior> BehaviorMutItem<'_, B> {
 
     /// Returns `true` if a [`Transition`] is currently in progress.
     pub fn has_transition(&self) -> bool {
-        use Transition::*;
-        !matches!(*self.transition, Stable | Started | Resumed)
+        self.transition.is_suspending()
     }
 
     /// Tries to start the given [`Behavior`] as the next one.
@@ -449,16 +445,7 @@ impl<B: Behavior> BehaviorMutItem<'_, B> {
     /// The next behavior will only start if it is allowed to by the [`transition()`] system.
     /// Otherwise, the transition is ignored.
     pub fn try_start(&mut self, next: B) -> Future<TransitionResult<B>> {
-        let (transition, future) = Transition::next(next);
-        let had_transition = self.has_transition();
-        let previous = replace(self.transition.as_mut(), transition);
-        if had_transition {
-            warn!(
-                "transition override: {previous:?} -> {:?}",
-                self.transition.as_ref(),
-            );
-        }
-        future
+        self.transition.try_start(next)
     }
 
     /// Stops the current [`Behavior`] and tries to resume the previous one.
@@ -468,28 +455,14 @@ impl<B: Behavior> BehaviorMutItem<'_, B> {
     ///
     /// If the current behavior is the initial one, it does nothing.
     pub fn stop(&mut self) {
-        let had_transition = self.has_transition();
-        let previous = replace(self.transition.as_mut(), Transition::previous());
-        if had_transition {
-            warn!(
-                "transition override: {previous:?} -> {:?}",
-                self.transition.as_ref(),
-            );
-        }
+        self.transition.stop();
     }
 
     /// Stops the current [`Behavior`] and resumes the initial one.
     ///
     /// If the current behavior is the initial one, it does nothing.
     pub fn reset(&mut self) {
-        let had_transition = self.has_transition();
-        let previous = replace(self.transition.as_mut(), Transition::reset());
-        if had_transition {
-            warn!(
-                "transition override: {previous:?} -> {:?}",
-                self.transition.as_ref(),
-            );
-        }
+        self.transition.reset();
     }
 
     /// Returns a reference to the previous [`Behavior`], if it exists.
