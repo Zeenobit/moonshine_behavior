@@ -1,4 +1,4 @@
-use bevy_ecs::prelude::*;
+use bevy_ecs::{prelude::*, query::QueryData};
 use bevy_reflect::prelude::*;
 
 use crate::Behavior;
@@ -51,5 +51,16 @@ impl<B: Behavior> Memory<B> {
 impl<B: Behavior> Default for Memory<B> {
     fn default() -> Self {
         Self(Vec::new())
+    }
+}
+
+#[derive(QueryData)]
+pub struct Previous<B: Behavior> {
+    memory: &'static Memory<B>,
+}
+
+impl<B: Behavior> PreviousItem<'_, B> {
+    pub fn get(&self) -> Option<&B> {
+        self.memory.previous()
     }
 }

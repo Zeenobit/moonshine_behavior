@@ -15,7 +15,7 @@ use moonshine_util::future::Future;
 pub mod prelude {
     pub use crate::{
         behavior_plugin, {transition, InvalidTransition, Transition, TransitionResult},
-        {Behavior, BehaviorBundle}, {Paused, Resumed, Started, Stopped},
+        {Behavior, BehaviorBundle}, {Paused, Previous, Resumed, Started, Stopped},
         {PausedEvent, ResumedEvent, StartedEvent, StoppedEvent},
     };
 
