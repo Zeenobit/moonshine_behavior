@@ -5,7 +5,7 @@ use bevy_reflect::prelude::*;
 use bevy_utils::tracing::{debug, error, warn};
 use moonshine_util::future::{Future, Promise};
 
-use crate::{Behavior, BehaviorEvents, Memory};
+use crate::{Behavior, BehaviorEventWriter, Memory};
 
 /// A [`Component`] used to trigger [`Behavior`] transitions.
 #[derive(Component, Default, Reflect)]
@@ -83,7 +83,7 @@ pub struct InvalidTransition<B: Behavior>(pub B);
 #[allow(clippy::type_complexity)]
 pub fn transition<B: Behavior>(
     mut query: Query<(Entity, &mut B, &mut Memory<B>, &mut Transition<B>)>,
-    mut events: BehaviorEvents<B>,
+    mut events: BehaviorEventWriter<B>,
 ) {
     for (entity, mut current, memory, mut transition) in &mut query {
         use Transition::*;
@@ -133,7 +133,7 @@ fn push<B: Behavior>(
     mut next: B,
     current: &mut Mut<B>,
     mut memory: Mut<Memory<B>>,
-    events: &mut BehaviorEvents<B>,
+    events: &mut BehaviorEventWriter<B>,
 ) -> TransitionResult<B> {
     if current.allows_next(&next) {
         debug!("{entity:?}: {:?} -> {next:?}", *current.as_ref());
@@ -162,7 +162,7 @@ fn pop<B: Behavior>(
     entity: Entity,
     mut current: Mut<B>,
     mut memory: Mut<Memory<B>>,
-    events: &mut BehaviorEvents<B>,
+    events: &mut BehaviorEventWriter<B>,
 ) -> bool {
     if let Some(mut next) = memory.pop() {
         debug!("{entity:?}: {:?} -> {next:?}", *current.as_ref());
@@ -183,7 +183,7 @@ fn reset<B: Behavior>(
     entity: Entity,
     mut current: Mut<B>,
     mut memory: Mut<Memory<B>>,
-    events: &mut BehaviorEvents<B>,
+    events: &mut BehaviorEventWriter<B>,
 ) -> bool {
     while memory.len() > 1 {
         let behavior = memory.pop().unwrap();

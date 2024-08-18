@@ -6,14 +6,14 @@ use crate::Behavior;
 
 #[doc(hidden)]
 #[derive(SystemParam)]
-pub struct BehaviorEvents<'w, B: Behavior> {
+pub struct BehaviorEventWriter<'w, B: Behavior> {
     started: EventWriter<'w, StartedEvent<B>>,
     resumed: EventWriter<'w, ResumedEvent<B>>,
     paused: EventWriter<'w, PausedEvent<B>>,
     stopped: EventWriter<'w, StoppedEvent<B>>,
 }
 
-impl<'w, B: Behavior> BehaviorEvents<'w, B> {
+impl<'w, B: Behavior> BehaviorEventWriter<'w, B> {
     pub(crate) fn send_started(&mut self, entity: Entity) {
         self.started.send(StartedEvent::new(entity));
     }
