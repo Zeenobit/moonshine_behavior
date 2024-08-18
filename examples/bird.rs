@@ -140,23 +140,19 @@ fn setup(mut commands: Commands) {
 }
 
 // Update the message text based on the current state of the Bird.
-//
-// TODO:
-// This is a bad example. Parallel behaviors should not be implemented like this.
-// Accessing behavior memory should only be required in specialized use cases.
 fn update_text(
-    query: Query<(&Bird, &moonshine_behavior::Memory<Bird>), Changed<Bird>>,
+    query: Query<(&Bird, Previous<Bird>), Changed<Bird>>,
     mut message: Query<&mut Text, With<Message>>,
 ) {
     use Bird::*;
-    if let Ok((bird, memory)) = query.get_single() {
+    if let Ok((bird, previous)) = query.get_single() {
         let mut text = message.single_mut();
         text.sections[0].value = match bird {
             Idle => "Bird is idle.",
             Fly => "Bird is flying.",
             Sleep => "Bird is sleeping.",
             Chirp => {
-                if let Some(Fly) = memory.previous() {
+                if let Some(Fly) = previous.get() {
                     "Bird is chirping while flying."
                 } else {
                     "Bird is chirping."
