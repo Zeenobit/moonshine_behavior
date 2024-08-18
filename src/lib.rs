@@ -25,30 +25,44 @@ pub mod prelude {
 #[cfg(test)]
 mod tests;
 
-/// Returns a [`Plugin`] which registers the given [`Behavior`] type with the [`App`].
+/// Returns a [`Plugin`] which registers the given [`Behavior`] with the [`App`].
 ///
 /// # Usage
-/// This plugin is required for behavior events and reflection to work.
+/// Add this plugin to your application during initialization for every behavior.
+///
+/// This plugin is required for behavior transition events to be sent at runtime.
+/// Without it, the [`transition`] system will [`panic`].
+///
+/// This plugin requires the behavior to support reflection (see [`Reflect`]).
+/// If `B` does not support reflection, use [`behavior_events_plugin`] instead.
+///
+/// [`Reflect`]: bevy_reflect::Reflect
+/// [`transition`]: crate::transition::transition
 pub fn behavior_plugin<B: RegisterableBehavior>() -> impl Plugin {
     |app: &mut App| {
-        app.add_plugins((behavior_events_plugin::<B>(), behavior_types_plugin::<B>()));
+        app.add_plugins(behavior_events_plugin::<B>())
+            .register_type::<Memory<B>>()
+            .register_type::<Transition<B>>();
     }
 }
 
+/// Returns a [`Plugin`] which adds the [`Behavior`] events to the [`App`].
+///
+/// # Usage
+/// Add this plugin to your application during initialization for every behavior which does not support reflection.
+///
+/// This plugin is required for behavior transition events to be sent at runtime.
+/// Without it, the [`transition`] system will [`panic`].
+///
+/// For behaviors which do support reflection, prefer to use [`behavior_plugin`] instead.
+///
+/// [`transition`]: crate::transition::transition
 pub fn behavior_events_plugin<B: Behavior>() -> impl Plugin {
     |app: &mut App| {
         app.add_event::<StartedEvent<B>>()
             .add_event::<PausedEvent<B>>()
             .add_event::<ResumedEvent<B>>()
             .add_event::<StoppedEvent<B>>();
-    }
-}
-
-pub fn behavior_types_plugin<B: RegisterableBehavior>() -> impl Plugin {
-    |app: &mut App| {
-        app.register_type::<Memory<B>>()
-            .register_type::<Vec<B>>()
-            .register_type::<Transition<B>>();
     }
 }
 
