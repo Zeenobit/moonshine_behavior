@@ -7,27 +7,35 @@ use crate::Behavior;
 #[doc(hidden)]
 #[derive(SystemParam)]
 pub struct BehaviorEventWriter<'w, B: Behavior> {
-    started: EventWriter<'w, StartedEvent<B>>,
-    resumed: EventWriter<'w, ResumedEvent<B>>,
-    paused: EventWriter<'w, PausedEvent<B>>,
-    stopped: EventWriter<'w, StoppedEvent<B>>,
+    started: Option<ResMut<'w, Events<StartedEvent<B>>>>,
+    resumed: Option<ResMut<'w, Events<ResumedEvent<B>>>>,
+    paused: Option<ResMut<'w, Events<PausedEvent<B>>>>,
+    stopped: Option<ResMut<'w, Events<StoppedEvent<B>>>>,
 }
 
 impl<'w, B: Behavior> BehaviorEventWriter<'w, B> {
     pub(crate) fn send_started(&mut self, entity: Entity) {
-        self.started.send(StartedEvent::new(entity));
+        if let Some(started) = &mut self.started {
+            started.send(StartedEvent::new(entity));
+        }
     }
 
     pub(crate) fn send_resumed(&mut self, entity: Entity) {
-        self.resumed.send(ResumedEvent::new(entity));
+        if let Some(resumed) = &mut self.resumed {
+            resumed.send(ResumedEvent::new(entity));
+        }
     }
 
     pub(crate) fn send_paused(&mut self, entity: Entity) {
-        self.paused.send(PausedEvent::new(entity));
+        if let Some(paused) = &mut self.paused {
+            paused.send(PausedEvent::new(entity));
+        }
     }
 
     pub(crate) fn send_stopped(&mut self, entity: Entity, behavior: B) {
-        self.stopped.send(StoppedEvent::new(entity, behavior));
+        if let Some(stopped) = &mut self.stopped {
+            stopped.send(StoppedEvent::new(entity, behavior));
+        }
     }
 }
 
