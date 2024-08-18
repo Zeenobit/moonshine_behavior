@@ -1,3 +1,5 @@
+#![doc = include_str!("../README.md")]
+
 use std::{
     borrow::{Borrow, BorrowMut},
     fmt::Debug,
@@ -23,13 +25,28 @@ pub mod prelude {
 #[cfg(test)]
 mod tests;
 
+/// Returns a [`Plugin`] which registers the given [`Behavior`] type with the [`App`].
+///
+/// # Usage
+/// This plugin is required for behavior events and reflection to work.
 pub fn behavior_plugin<B: RegisterableBehavior>() -> impl Plugin {
+    |app: &mut App| {
+        app.add_plugins((behavior_events_plugin::<B>(), behavior_types_plugin::<B>()));
+    }
+}
+
+pub fn behavior_events_plugin<B: Behavior>() -> impl Plugin {
     |app: &mut App| {
         app.add_event::<StartedEvent<B>>()
             .add_event::<PausedEvent<B>>()
             .add_event::<ResumedEvent<B>>()
-            .add_event::<StoppedEvent<B>>()
-            .register_type::<Memory<B>>()
+            .add_event::<StoppedEvent<B>>();
+    }
+}
+
+pub fn behavior_types_plugin<B: RegisterableBehavior>() -> impl Plugin {
+    |app: &mut App| {
+        app.register_type::<Memory<B>>()
             .register_type::<Vec<B>>()
             .register_type::<Transition<B>>();
     }
