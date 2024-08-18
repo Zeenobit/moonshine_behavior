@@ -1,7 +1,6 @@
 use std::{
     borrow::{Borrow, BorrowMut},
     fmt::Debug,
-    marker::PhantomData,
     mem::replace,
     ops::{Deref, DerefMut},
 };
@@ -10,11 +9,11 @@ use bevy_app::{App, Plugin};
 use bevy_ecs::{component::Tick, prelude::*, query::QueryData};
 use bevy_reflect::{FromReflect, GetTypeRegistration, TypePath};
 use bevy_utils::tracing::warn;
-use moonshine_util::{app::FnPlugin, future::Future};
+use moonshine_util::future::Future;
 
 pub mod prelude {
     pub use crate::{
-        behavior_plugin, BehaviorPlugin, {transition, InvalidTransition, TransitionResult},
+        behavior_plugin, {transition, InvalidTransition, TransitionResult},
         {Behavior, BehaviorBundle}, {BehaviorMut, BehaviorRef},
         {Paused, Resumed, Started, Stopped},
         {PausedEvent, ResumedEvent, StartedEvent, StoppedEvent},
@@ -24,8 +23,8 @@ pub mod prelude {
 #[cfg(test)]
 mod tests;
 
-pub fn behavior_plugin<B: RegisterableBehavior>() -> impl FnPlugin {
-    |app| {
+pub fn behavior_plugin<B: RegisterableBehavior>() -> impl Plugin {
+    |app: &mut App| {
         app.add_event::<StartedEvent<B>>()
             .add_event::<PausedEvent<B>>()
             .add_event::<ResumedEvent<B>>()
@@ -33,21 +32,6 @@ pub fn behavior_plugin<B: RegisterableBehavior>() -> impl FnPlugin {
             .register_type::<Memory<B>>()
             .register_type::<Vec<B>>()
             .register_type::<Transition<B>>();
-    }
-}
-
-/// A [`Plugin`] which registers a [`Behavior`] type with its [`App`].
-pub struct BehaviorPlugin<B: RegisterableBehavior>(PhantomData<B>);
-
-impl<B: RegisterableBehavior> Default for BehaviorPlugin<B> {
-    fn default() -> Self {
-        Self(PhantomData)
-    }
-}
-
-impl<B: RegisterableBehavior> Plugin for BehaviorPlugin<B> {
-    fn build(&self, app: &mut App) {
-        behavior_plugin::<B>()(app);
     }
 }
 
