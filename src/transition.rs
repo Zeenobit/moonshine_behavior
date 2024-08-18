@@ -171,7 +171,7 @@ fn push<B: Behavior>(
     events: &mut BehaviorEventWriter<B>,
 ) -> TransitionResult<B> {
     if current.allows_next(&next) {
-        debug!("{current:?}: {:?} -> {next:?}", current);
+        debug!("{current:?}: {:?} -> {next:?}", **current);
         let behavior = {
             mem::swap(current.as_mut(), &mut next);
             next
@@ -185,7 +185,7 @@ fn push<B: Behavior>(
         events.send_started(current.instance());
         Ok(())
     } else {
-        warn!("{current:?}: {:?} -> {next:?} is not allowed", current);
+        warn!("{current:?}: {:?} -> {next:?} is not allowed", **current);
         Err(InvalidTransition(next))
     }
 }
@@ -196,7 +196,7 @@ fn pop<B: Behavior>(
     events: &mut BehaviorEventWriter<B>,
 ) -> bool {
     if let Some(mut next) = memory.pop() {
-        debug!("{current:?}: {:?} -> {next:?}", current);
+        debug!("{current:?}: {:?} -> {next:?}", **current);
         let behavior = {
             mem::swap(current.as_mut(), &mut next);
             next
@@ -205,7 +205,7 @@ fn pop<B: Behavior>(
         events.send_stopped(current.instance(), behavior);
         true
     } else {
-        error!("{current:?}: {:?} -> None is not allowed", current);
+        error!("{current:?}: {:?} -> None is not allowed", **current);
         false
     }
 }
@@ -221,7 +221,7 @@ fn reset<B: Behavior>(
     }
 
     if let Some(mut next) = memory.pop() {
-        debug!("{current:?}: {:?} -> {next:?}", current);
+        debug!("{current:?}: {:?} -> {next:?}", **current);
         let behavior = {
             mem::swap(current.as_mut(), &mut next);
             next
@@ -230,7 +230,10 @@ fn reset<B: Behavior>(
         events.send_stopped(current.instance(), behavior);
         true
     } else {
-        warn!("{current:?}: {:?} -> {:?} is redundant", current, current);
+        warn!(
+            "{current:?}: {:?} -> {:?} is redundant",
+            **current, **current
+        );
         false
     }
 }
