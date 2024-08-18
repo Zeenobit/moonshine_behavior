@@ -1,3 +1,4 @@
+#![allow(deprecated)] // TODO: Remove after 0.2.0
 #![doc = include_str!("../README.md")]
 
 use std::{
@@ -14,10 +15,12 @@ use moonshine_util::future::Future;
 pub mod prelude {
     pub use crate::{
         behavior_plugin, {transition, InvalidTransition, Transition, TransitionResult},
-        {Behavior, BehaviorBundle}, {BehaviorMut, BehaviorRef},
-        {Paused, Resumed, Started, Stopped},
+        {Behavior, BehaviorBundle}, {Paused, Resumed, Started, Stopped},
         {PausedEvent, ResumedEvent, StartedEvent, StoppedEvent},
     };
+
+    // TODO: To be removed after 0.2.0
+    pub use crate::{BehaviorMut, BehaviorRef};
 }
 
 #[cfg(test)]
