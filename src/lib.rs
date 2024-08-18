@@ -13,7 +13,7 @@ use moonshine_util::future::Future;
 
 pub mod prelude {
     pub use crate::{
-        behavior_plugin, {transition, InvalidTransition, TransitionResult},
+        behavior_plugin, {transition, InvalidTransition, Transition, TransitionResult},
         {Behavior, BehaviorBundle}, {BehaviorMut, BehaviorRef},
         {Paused, Resumed, Started, Stopped},
         {PausedEvent, ResumedEvent, StartedEvent, StoppedEvent},
@@ -242,6 +242,7 @@ impl<B: Behavior> From<B> for BehaviorBundle<B> {
 
 /// A [`QueryData`] used to query a [`Behavior`].
 #[derive(QueryData)]
+#[deprecated(since = "0.1.5", note = "query behavior components directly")]
 pub struct BehaviorRef<B: Behavior> {
     behavior: Ref<'static, B>,
     memory: &'static Memory<B>,
@@ -250,42 +251,51 @@ pub struct BehaviorRef<B: Behavior> {
 
 impl<B: Behavior> BehaviorRefItem<'_, B> {
     /// Returns a reference to the current [`Behavior`].
+    #[deprecated(since = "0.1.5", note = "query behavior component directly")]
     pub fn get(&self) -> &B {
         &self.behavior
     }
 
     /// Returns `true` if the current [`Behavior`] was just started.
+    #[deprecated(
+        since = "0.1.5",
+        note = "use `Transition::<B>::is_started` instead; check `Added<B>` to handle initialization."
+    )]
     pub fn is_started(&self) -> bool {
-        matches!(self.transition, Transition::Started) || self.is_added()
+        self.transition.is_started() || self.is_added()
     }
 
     /// Returns `true` if the current [`Behavior`] was just resumed.
+    #[deprecated(since = "0.1.5", note = "use `Transition::<B>::is_resumed` instead")]
     pub fn is_resumed(&self) -> bool {
-        matches!(self.transition, Transition::Resumed)
+        self.transition.is_resumed()
     }
 
     /// Returns `true` if the current [`Behavior`] is active and not in a transition.
+    #[deprecated(since = "0.1.5", note = "use `Transition::<B>::is_stable` instead")]
     pub fn is_stable(&self) -> bool {
-        matches!(self.transition, Transition::Stable)
+        self.transition.is_stable()
     }
 
-    /// Returns a reference to the current [`Behavior`] if it was changed since last query.
+    #[deprecated(since = "0.1.5", note = "query behavior component directly")]
     pub fn get_changed(&self) -> Option<&B> {
         self.is_changed().then(|| self.get())
     }
 
     /// Returns `true` if a [`Transition`] is currently in progress.
+    #[deprecated(since = "0.1.5", note = "use `Transition::<B>::is_suspending` instead")]
     pub fn has_transition(&self) -> bool {
-        use Transition::*;
-        !matches!(self.transition, Stable | Started | Resumed)
+        self.transition.is_suspending()
     }
 
     /// Returns a reference to the previous [`Behavior`], if it exists.
+    #[deprecated(since = "0.1.5", note = "use `Memory::<B>::previous` instead")]
     pub fn previous(&self) -> Option<&B> {
         self.memory.previous()
     }
 
     /// Returns a reference to the [`Behavior`] [`Memory`].
+    #[deprecated(since = "0.1.5", note = "query `Memory<B>` directly")]
     pub fn memory(&self) -> &Memory<B> {
         self.memory
     }
@@ -322,6 +332,10 @@ impl<B: Behavior> DetectChanges for BehaviorRefItem<'_, B> {
 /// A mutable [`QueryData`] used to query and manipulate a [`Behavior`].
 #[derive(QueryData)]
 #[query_data(mutable)]
+#[deprecated(
+    since = "0.1.5",
+    note = "query behavior components directly; use `&mut Transition::<B>` to invoke transitions"
+)]
 pub struct BehaviorMut<B: Behavior> {
     behavior: Mut<'static, B>,
     memory: &'static Memory<B>,
@@ -330,41 +344,52 @@ pub struct BehaviorMut<B: Behavior> {
 
 impl<B: Behavior> BehaviorMutReadOnlyItem<'_, B> {
     /// Returns a reference to the current [`Behavior`].
+    #[deprecated(since = "0.1.5", note = "query behavior component directly")]
     pub fn get(&self) -> &B {
         &self.behavior
     }
 
     /// Returns `true` if the current [`Behavior`] was just started.
+    #[deprecated(
+        since = "0.1.5",
+        note = "use `Transition::<B>::is_started` instead; check `Added<B>` to handle initialization."
+    )]
     pub fn is_started(&self) -> bool {
         self.transition.is_started() || self.is_added()
     }
 
     /// Returns `true` if the current [`Behavior`] was just resumed.
+    #[deprecated(since = "0.1.5", note = "use `Transition::<B>::is_resumed` instead")]
     pub fn is_resumed(&self) -> bool {
         self.transition.is_resumed()
     }
 
     /// Returns `true` if the current [`Behavior`] is active and not in a transition.
+    #[deprecated(since = "0.1.5", note = "use `Transition::<B>::is_stable` instead")]
     pub fn is_stable(&self) -> bool {
         self.transition.is_stable()
     }
 
     /// Returns a reference to the current [`Behavior`] if it was changed since last query.
+    #[deprecated(since = "0.1.5", note = "query behavior component directly")]
     pub fn get_changed(&self) -> Option<&B> {
         self.is_changed().then(|| self.get())
     }
 
     /// Returns `true` if a [`Transition`] is currently in progress.
+    #[deprecated(since = "0.1.5", note = "use `Transition::<B>::is_suspending` instead")]
     pub fn has_transition(&self) -> bool {
         self.transition.is_suspending()
     }
 
     /// Returns a reference to the previous [`Behavior`], if it exists.
+    #[deprecated(since = "0.1.5", note = "use `Memory::<B>::previous` instead")]
     pub fn previous(&self) -> Option<&B> {
         self.memory.previous()
     }
 
     /// Returns a reference to the [`Behavior`] [`Memory`].
+    #[deprecated(since = "0.1.5", note = "query `Memory<B>` directly")]
     pub fn memory(&self) -> &Memory<B> {
         self.memory
     }
@@ -400,41 +425,52 @@ impl<B: Behavior> DetectChanges for BehaviorMutReadOnlyItem<'_, B> {
 
 impl<B: Behavior> BehaviorMutItem<'_, B> {
     /// Returns a reference to the current [`Behavior`].
+    #[deprecated(since = "0.1.5", note = "query behavior component directly")]
     pub fn get(&self) -> &B {
         &self.behavior
     }
 
     /// Returns a mutable reference to the current [`Behavior`].
+    #[deprecated(since = "0.1.5", note = "query behavior component directly")]
     pub fn get_mut(&mut self) -> &mut B {
         &mut self.behavior
     }
 
     /// Returns `true` if the current [`Behavior`] was just started.
+    #[deprecated(
+        since = "0.1.5",
+        note = "use `Transition::<B>::is_started` instead; check `Added<B>` to handle initialization."
+    )]
     pub fn is_started(&self) -> bool {
         self.transition.is_started() || self.is_added()
     }
 
     /// Returns `true` if the current [`Behavior`] was just resumed.
+    #[deprecated(since = "0.1.5", note = "use `Transition::<B>::is_resumed` instead")]
     pub fn is_resumed(&self) -> bool {
         self.transition.is_resumed()
     }
 
     /// Returns `true` if the current [`Behavior`] is active and not in a transition.
+    #[deprecated(since = "0.1.5", note = "use `Transition::<B>::is_stable` instead")]
     pub fn is_stable(&self) -> bool {
         self.transition.is_stable()
     }
 
     /// Returns a reference to the current [`Behavior`] if it was changed since last query.
+    #[deprecated(since = "0.1.5", note = "query behavior component directly")]
     pub fn get_changed(&self) -> Option<&B> {
         self.is_changed().then(|| self.get())
     }
 
     /// Returns a mutable reference to the current [`Behavior`] if it was changed since last query.
+    #[deprecated(since = "0.1.5", note = "query behavior component directly")]
     pub fn get_changed_mut(&mut self) -> Option<&mut B> {
         self.is_changed().then(|| self.get_mut())
     }
 
     /// Returns `true` if a [`Transition`] is currently in progress.
+    #[deprecated(since = "0.1.5", note = "use `Transition::<B>::is_suspending` instead")]
     pub fn has_transition(&self) -> bool {
         self.transition.is_suspending()
     }
@@ -444,6 +480,7 @@ impl<B: Behavior> BehaviorMutItem<'_, B> {
     /// This only sets the behavior [`Transition`], and does not immediately modify the behavior.
     /// The next behavior will only start if it is allowed to by the [`transition()`] system.
     /// Otherwise, the transition is ignored.
+    #[deprecated(since = "0.1.5", note = "use `Transition::<B>::try_start` instead")]
     pub fn try_start(&mut self, next: B) -> Future<TransitionResult<B>> {
         self.transition.try_start(next)
     }
@@ -454,6 +491,7 @@ impl<B: Behavior> BehaviorMutItem<'_, B> {
     /// and so on until a resumable behavior is found.
     ///
     /// If the current behavior is the initial one, it does nothing.
+    #[deprecated(since = "0.1.5", note = "use `Transition::<B>::stop` instead")]
     pub fn stop(&mut self) {
         self.transition.stop();
     }
@@ -461,16 +499,19 @@ impl<B: Behavior> BehaviorMutItem<'_, B> {
     /// Stops the current [`Behavior`] and resumes the initial one.
     ///
     /// If the current behavior is the initial one, it does nothing.
+    #[deprecated(since = "0.1.5", note = "use `Transition::<B>::reset` instead")]
     pub fn reset(&mut self) {
         self.transition.reset();
     }
 
     /// Returns a reference to the previous [`Behavior`], if it exists.
+    #[deprecated(since = "0.1.5", note = "use `Memory::<B>::previous` instead")]
     pub fn previous(&self) -> Option<&B> {
         self.memory.previous()
     }
 
     /// Returns a reference to the [`Behavior`] [`Memory`].
+    #[deprecated(since = "0.1.5", note = "query `Memory<B>` directly")]
     pub fn memory(&self) -> &Memory<B> {
         self.memory
     }
