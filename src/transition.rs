@@ -3,6 +3,8 @@ use std::{fmt, mem};
 use bevy_ecs::prelude::*;
 use bevy_reflect::prelude::*;
 use bevy_utils::tracing::{debug, error, warn};
+
+use moonshine_kind::{prelude::*, InstanceMutItem};
 use moonshine_util::future::{Future, Promise};
 
 use crate::{Behavior, BehaviorEventWriter, Memory};
@@ -114,12 +116,11 @@ pub type TransitionResult<B> = Result<(), InvalidTransition<B>>;
 pub struct InvalidTransition<B: Behavior>(pub B);
 
 /// A [`System`] which triggers [`Behavior`] transitions.
-#[allow(clippy::type_complexity)]
 pub fn transition<B: Behavior>(
-    mut query: Query<(Entity, &mut B, &mut Memory<B>, &mut Transition<B>)>,
+    mut query: Query<(InstanceMut<B>, &mut Memory<B>, &mut Transition<B>)>,
     mut events: BehaviorEventWriter<B>,
 ) {
-    for (entity, mut current, memory, mut transition) in &mut query {
+    for (mut current, memory, mut transition) in &mut query {
         use Transition::*;
 
         // Do not mutate the transition if stable:
@@ -129,7 +130,7 @@ pub fn transition<B: Behavior>(
 
         match transition.take() {
             Next(next, promise) => {
-                let value = push(entity, next, &mut current, memory, &mut events);
+                let value = push(&mut current, next, memory, &mut events);
                 if value.is_ok() {
                     if let Some(next) = current.started() {
                         *transition = Next(next, Promise::new());
@@ -141,16 +142,16 @@ pub fn transition<B: Behavior>(
             }
             Previous => {
                 if let Some(next) = current.stopped() {
-                    let value = push(entity, next, &mut current, memory, &mut events);
+                    let value = push(&mut current, next, memory, &mut events);
                     if value.is_ok() {
                         *transition = Started;
                     }
-                } else if pop(entity, current, memory, &mut events) {
+                } else if pop(&mut current, memory, &mut events) {
                     *transition = Resumed;
                 }
             }
             Reset => {
-                if reset(entity, current, memory, &mut events) {
+                if reset(&mut current, memory, &mut events) {
                     *transition = Resumed;
                 }
             }
@@ -163,82 +164,72 @@ pub fn transition<B: Behavior>(
 }
 
 fn push<B: Behavior>(
-    entity: Entity,
+    current: &mut InstanceMutItem<B>,
     mut next: B,
-    current: &mut Mut<B>,
     mut memory: Mut<Memory<B>>,
     events: &mut BehaviorEventWriter<B>,
 ) -> TransitionResult<B> {
     if current.allows_next(&next) {
-        debug!("{entity:?}: {:?} -> {next:?}", *current.as_ref());
+        debug!("{current:?}: {:?} -> {next:?}", current);
         let behavior = {
             mem::swap(current.as_mut(), &mut next);
             next
         };
         if behavior.is_resumable() {
-            events.send_paused(entity);
+            events.send_paused(current.instance());
             memory.push(behavior);
         } else {
-            events.send_stopped(entity, behavior);
+            events.send_stopped(current.instance(), behavior);
         }
-        events.send_started(entity);
+        events.send_started(current.instance());
         Ok(())
     } else {
-        warn!(
-            "{entity}: {:?} -> {next:?} is not allowed",
-            *current.as_ref()
-        );
+        warn!("{current:?}: {:?} -> {next:?} is not allowed", current);
         Err(InvalidTransition(next))
     }
 }
 
 fn pop<B: Behavior>(
-    entity: Entity,
-    mut current: Mut<B>,
+    current: &mut InstanceMutItem<B>,
     mut memory: Mut<Memory<B>>,
     events: &mut BehaviorEventWriter<B>,
 ) -> bool {
     if let Some(mut next) = memory.pop() {
-        debug!("{entity:?}: {:?} -> {next:?}", *current.as_ref());
+        debug!("{current:?}: {:?} -> {next:?}", current);
         let behavior = {
             mem::swap(current.as_mut(), &mut next);
             next
         };
-        events.send_resumed(entity);
-        events.send_stopped(entity, behavior);
+        events.send_resumed(current.instance());
+        events.send_stopped(current.instance(), behavior);
         true
     } else {
-        error!("{entity}: {:?} -> None is not allowed", *current.as_ref());
+        error!("{current:?}: {:?} -> None is not allowed", current);
         false
     }
 }
 
 fn reset<B: Behavior>(
-    entity: Entity,
-    mut current: Mut<B>,
+    current: &mut InstanceMutItem<B>,
     mut memory: Mut<Memory<B>>,
     events: &mut BehaviorEventWriter<B>,
 ) -> bool {
     while memory.len() > 1 {
         let behavior = memory.pop().unwrap();
-        events.send_stopped(entity, behavior);
+        events.send_stopped(current.instance(), behavior);
     }
 
     if let Some(mut next) = memory.pop() {
-        debug!("{entity:?}: {:?} -> {next:?}", *current.as_ref());
+        debug!("{current:?}: {:?} -> {next:?}", current);
         let behavior = {
             mem::swap(current.as_mut(), &mut next);
             next
         };
-        events.send_resumed(entity);
-        events.send_stopped(entity, behavior);
+        events.send_resumed(current.instance());
+        events.send_stopped(current.instance(), behavior);
         true
     } else {
-        warn!(
-            "{entity}: {:?} -> {:?} is redundant",
-            *current.as_ref(),
-            *current.as_ref()
-        );
+        warn!("{current:?}: {:?} -> {:?} is redundant", current, current);
         false
     }
 }

@@ -1,6 +1,6 @@
-use std::marker::PhantomData;
-
 use bevy_ecs::{prelude::*, system::SystemParam};
+
+use moonshine_kind::prelude::*;
 
 use crate::Behavior;
 
@@ -14,27 +14,27 @@ pub struct BehaviorEventWriter<'w, B: Behavior> {
 }
 
 impl<'w, B: Behavior> BehaviorEventWriter<'w, B> {
-    pub(crate) fn send_started(&mut self, entity: Entity) {
+    pub(crate) fn send_started(&mut self, instance: Instance<B>) {
         if let Some(started) = &mut self.started {
-            started.send(StartedEvent::new(entity));
+            started.send(StartedEvent { instance });
         }
     }
 
-    pub(crate) fn send_resumed(&mut self, entity: Entity) {
+    pub(crate) fn send_resumed(&mut self, instance: Instance<B>) {
         if let Some(resumed) = &mut self.resumed {
-            resumed.send(ResumedEvent::new(entity));
+            resumed.send(ResumedEvent { instance });
         }
     }
 
-    pub(crate) fn send_paused(&mut self, entity: Entity) {
+    pub(crate) fn send_paused(&mut self, instance: Instance<B>) {
         if let Some(paused) = &mut self.paused {
-            paused.send(PausedEvent::new(entity));
+            paused.send(PausedEvent { instance });
         }
     }
 
-    pub(crate) fn send_stopped(&mut self, entity: Entity, behavior: B) {
+    pub(crate) fn send_stopped(&mut self, instance: Instance<B>, behavior: B) {
         if let Some(stopped) = &mut self.stopped {
-            stopped.send(StoppedEvent::new(entity, behavior));
+            stopped.send(StoppedEvent { instance, behavior });
         }
     }
 }
@@ -42,81 +42,57 @@ impl<'w, B: Behavior> BehaviorEventWriter<'w, B> {
 /// An event emitted when a [`Behavior`] is started.
 #[derive(Event)]
 pub struct StartedEvent<B: Behavior> {
-    entity: Entity,
-    marker: PhantomData<B>,
+    pub instance: Instance<B>,
 }
 
 impl<B: Behavior> StartedEvent<B> {
-    fn new(entity: Entity) -> Self {
-        Self {
-            entity,
-            marker: PhantomData,
-        }
-    }
-
     /// Returns the [`Entity`] that started the [`Behavior`].
     pub fn entity(&self) -> Entity {
-        self.entity
+        self.instance.entity()
     }
 }
 
 /// An event emitted when a [`Behavior`] is resumed.
 #[derive(Event)]
 pub struct ResumedEvent<B: Behavior> {
-    entity: Entity,
-    marker: PhantomData<B>,
+    pub instance: Instance<B>,
 }
 
 impl<B: Behavior> ResumedEvent<B> {
-    fn new(entity: Entity) -> Self {
-        Self {
-            entity,
-            marker: PhantomData,
-        }
-    }
-
     /// Returns the [`Entity`] that resumed the [`Behavior`].
     pub fn entity(&self) -> Entity {
-        self.entity
+        self.instance.entity()
+    }
+
+    pub fn instance(&self) -> &Instance<B> {
+        &self.instance
     }
 }
 
 /// An event emitted when a [`Behavior`] is paused.
 #[derive(Event)]
 pub struct PausedEvent<B: Behavior> {
-    entity: Entity,
-    marker: PhantomData<B>,
+    pub instance: Instance<B>,
 }
 
 impl<B: Behavior> PausedEvent<B> {
-    fn new(entity: Entity) -> Self {
-        Self {
-            entity,
-            marker: PhantomData,
-        }
-    }
-
     /// Returns the [`Entity`] that paused the [`Behavior`].
     pub fn entity(&self) -> Entity {
-        self.entity
+        self.instance.entity()
     }
 }
 
 /// An event emitted when a [`Behavior`] is stopped.
 #[derive(Event)]
 pub struct StoppedEvent<B: Behavior> {
-    entity: Entity,
-    behavior: B,
+    pub instance: Instance<B>,
+    pub behavior: B,
 }
 
 impl<B: Behavior> StoppedEvent<B> {
-    fn new(entity: Entity, behavior: B) -> Self {
-        Self { entity, behavior }
-    }
-
     /// Returns the [`Entity`] that stopped the [`Behavior`].
     pub fn entity(&self) -> Entity {
-        self.entity
+        self.instance.entity()
     }
 
     /// Returns the [`Behavior`] that was stopped.
