@@ -140,19 +140,23 @@ fn setup(mut commands: Commands) {
 }
 
 // Update the message text based on the current state of the Bird.
+//
+// TODO:
+// This is a bad example. Parallel behaviors should not be implemented like this.
+// Accessing behavior memory should only be required in specialized use cases.
 fn update_text(
-    query: Query<BehaviorRef<Bird>, Changed<Bird>>,
+    query: Query<(&Bird, &moonshine_behavior::Memory<Bird>), Changed<Bird>>,
     mut message: Query<&mut Text, With<Message>>,
 ) {
     use Bird::*;
-    if let Ok(behavior) = query.get_single() {
+    if let Ok((bird, memory)) = query.get_single() {
         let mut text = message.single_mut();
-        text.sections[0].value = match *behavior {
+        text.sections[0].value = match bird {
             Idle => "Bird is idle.",
             Fly => "Bird is flying.",
             Sleep => "Bird is sleeping.",
             Chirp => {
-                if let Some(Fly) = behavior.previous() {
+                if let Some(Fly) = memory.previous() {
                     "Bird is chirping while flying."
                 } else {
                     "Bird is chirping."
@@ -165,7 +169,7 @@ fn update_text(
 
 // Update the button colors based on the current state of the Bird.
 fn update_buttons(
-    query: Query<BehaviorRef<Bird>, Changed<Bird>>,
+    query: Query<&Bird, Changed<Bird>>,
     mut buttons: Query<(&Action, &mut BackgroundColor), With<Button>>,
 ) {
     use Bird::*;
@@ -189,18 +193,18 @@ fn update_buttons(
 // Modify the Bird behavior based on button clicks.
 fn on_button_clicked(
     query: Query<(&Action, &Interaction), Changed<Interaction>>,
-    mut bird: Query<BehaviorMut<Bird>>,
+    mut bird: Query<&mut Transition<Bird>>,
 ) {
     use Bird::*;
-    let mut behavior = bird.single_mut();
+    let mut transition = bird.single_mut();
     for (action, interaction) in query.iter() {
         if let Interaction::Pressed = interaction {
             match action {
-                Action::Fly => drop(behavior.try_start(Fly)),
-                Action::Sleep => drop(behavior.try_start(Sleep)),
-                Action::Chirp => drop(behavior.try_start(Chirp)),
-                Action::Stop => behavior.stop(),
-                Action::Reset => behavior.reset(),
+                Action::Fly => drop(transition.try_start(Fly)),
+                Action::Sleep => drop(transition.try_start(Sleep)),
+                Action::Chirp => drop(transition.try_start(Chirp)),
+                Action::Stop => transition.stop(),
+                Action::Reset => transition.reset(),
             }
         }
     }
