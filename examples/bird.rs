@@ -18,7 +18,7 @@ fn main() {
         }))
         // Add the BehaviorPlugin for Bird behavior.
         // This plugin is required for the behavior system to work with a behavior type.
-        .add_plugins(behavior_plugin::<Bird>())
+        .add_plugins(behavior_plugin::<Bird>)
         // Add the transition system for Bird behavior
         // Behavior changes happen in this system. Register your systems before or after it as needed.
         .add_systems(Update, transition::<Bird>)

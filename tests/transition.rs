@@ -28,7 +28,7 @@ impl Behavior for B {
 
 fn app() -> App {
     let mut app = App::new();
-    app.add_plugins((MinimalPlugins, behavior_plugin::<B>()))
+    app.add_plugins((MinimalPlugins, behavior_plugin::<B>))
         .add_systems(Update, transition::<B>);
     app
 }

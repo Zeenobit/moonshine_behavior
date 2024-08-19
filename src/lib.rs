@@ -7,7 +7,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use bevy_app::{App, Plugin};
+use bevy_app::App;
 use bevy_ecs::{component::Tick, prelude::*, query::QueryData};
 use bevy_reflect::{FromReflect, GetTypeRegistration, TypePath};
 use moonshine_util::future::Future;
@@ -36,12 +36,10 @@ pub mod prelude {
 ///
 /// [`Reflect`]: bevy_reflect::Reflect
 /// [`transition`]: crate::transition::transition
-pub fn behavior_plugin<B: RegisterableBehavior>() -> impl Plugin {
-    |app: &mut App| {
-        app.add_plugins(behavior_events_plugin::<B>())
-            .register_type::<Memory<B>>()
-            .register_type::<Transition<B>>();
-    }
+pub fn behavior_plugin<B: RegisterableBehavior>(app: &mut App) {
+    app.add_plugins(behavior_events_plugin::<B>)
+        .register_type::<Memory<B>>()
+        .register_type::<Transition<B>>();
 }
 
 /// Returns a [`Plugin`] which adds the [`Behavior`] events to the [`App`].
@@ -55,13 +53,11 @@ pub fn behavior_plugin<B: RegisterableBehavior>() -> impl Plugin {
 /// For behaviors which do support reflection, prefer to use [`behavior_plugin`] instead.
 ///
 /// [`transition`]: crate::transition::transition
-pub fn behavior_events_plugin<B: Behavior>() -> impl Plugin {
-    |app: &mut App| {
-        app.add_event::<StartedEvent<B>>()
-            .add_event::<PausedEvent<B>>()
-            .add_event::<ResumedEvent<B>>()
-            .add_event::<StoppedEvent<B>>();
-    }
+pub fn behavior_events_plugin<B: Behavior>(app: &mut App) {
+    app.add_event::<StartedEvent<B>>()
+        .add_event::<PausedEvent<B>>()
+        .add_event::<ResumedEvent<B>>()
+        .add_event::<StoppedEvent<B>>();
 }
 
 /// A [`Component`] which represents some state of its [`Entity`].
