@@ -9,39 +9,36 @@ use moonshine_util::future::{Future, Promise};
 
 use crate::{Behavior, BehaviorEventWriter, Memory};
 
-/// A [`Component`] used to trigger [`Behavior`] transitions.
-#[derive(Component, Default, Reflect)]
+use TransitionState::*;
+
+/// A [`Component`] which stores the transition state of a [`Behavior`].
+#[derive(Component, Reflect)]
 #[reflect(Component)]
-pub enum Transition<B: Behavior> {
-    Stable,
-    #[default]
-    Started,
-    Resumed,
-    #[reflect(ignore)]
-    Next(B, #[reflect(ignore)] Promise<TransitionResult<B>>),
-    #[reflect(ignore)]
-    Previous,
-    #[reflect(ignore)]
-    Reset,
+pub struct Transition<B: Behavior>(TransitionState<B>);
+
+impl<B: Behavior> Default for Transition<B> {
+    fn default() -> Self {
+        Self(TransitionState::default())
+    }
 }
 
 impl<B: Behavior> Transition<B> {
-    pub fn next(next: B) -> (Self, Future<TransitionResult<B>>) {
+    pub(crate) fn next(next: B) -> (Self, Future<TransitionResult<B>>) {
         let (promise, future) = Promise::start();
-        let transition = Self::Next(next, promise);
-        (transition, future)
+        let state = TransitionState::Next(next, promise);
+        (Self(state), future)
     }
 
     pub fn is_started(&self) -> bool {
-        matches!(self, Self::Started)
+        matches!(self.0, Started)
     }
 
     pub fn is_resumed(&self) -> bool {
-        matches!(self, Self::Resumed)
+        matches!(self.0, Resumed)
     }
 
     pub fn is_stable(&self) -> bool {
-        matches!(self, Self::Stable)
+        matches!(self.0, Stable)
     }
 
     pub fn is_activated(&self) -> bool {
@@ -49,7 +46,7 @@ impl<B: Behavior> Transition<B> {
     }
 
     pub fn is_suspending(&self) -> bool {
-        matches!(self, Self::Next { .. } | Self::Previous | Self::Reset)
+        matches!(self.0, Next(..) | Previous | Reset)
     }
 
     pub fn try_start(&mut self, behavior: B) -> Future<TransitionResult<B>> {
@@ -62,49 +59,47 @@ impl<B: Behavior> Transition<B> {
     }
 
     pub fn stop(&mut self) {
-        let old = mem::replace(self, Self::Previous);
+        let old = Self(mem::replace(&mut self.0, Previous));
         if old.is_suspending() {
             warn!("transition override: {old:?} -> {self:?}");
         }
     }
 
     pub fn reset(&mut self) {
-        let old = mem::replace(self, Self::Reset);
+        let old = Self(mem::replace(&mut self.0, Reset));
         if old.is_suspending() {
             warn!("transition override: {old:?} -> {self:?}");
         }
     }
 
     fn take(&mut self) -> Self {
-        let mut t = Self::Stable;
-        mem::swap(self, &mut t);
-        t
+        Self(mem::replace(&mut self.0, Stable))
     }
 
     pub(crate) fn clone(&self) -> Self
     where
         B: Clone,
     {
-        use Transition::*;
-        match self {
+        use TransitionState::*;
+        Self(match &self.0 {
             Stable => Stable,
             Started => Started,
             Resumed => Resumed,
-            Next(next, _) => Next(next.clone(), Promise::new()),
+            Next(next, ..) => Next(next.clone(), Promise::new()),
             Previous => Previous,
             Reset => Reset,
-        }
+        })
     }
 }
 
 impl<B: Behavior> fmt::Debug for Transition<B> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Transition::*;
-        match self {
+        use TransitionState::*;
+        match &self.0 {
             Stable => write!(f, "Stable"),
             Started => write!(f, "Started"),
             Resumed => write!(f, "Resumed"),
-            Next(arg0, _) => f.debug_tuple("Next").field(arg0).finish(),
+            Next(next, ..) => f.debug_tuple("Next").field(next).finish(),
             Previous => write!(f, "Previous"),
             Reset => write!(f, "Reset"),
         }
@@ -122,21 +117,21 @@ pub fn transition<B: Behavior>(
     mut events: BehaviorEventWriter<B>,
 ) {
     for (mut current, memory, mut transition) in &mut query {
-        use Transition::*;
+        use TransitionState::*;
 
-        // Do not mutate the transition if stable:
-        if matches!(*transition, Stable) {
+        if transition.is_stable() {
+            // Do not mutate the transition if stable
             continue;
         }
 
-        match transition.take() {
+        match transition.take().0 {
             Next(next, promise) => {
                 let result = push(&mut current, next, memory, &mut events);
                 if result.is_ok() {
                     if let Some(next) = current.started() {
-                        *transition = Next(next, Promise::new());
+                        transition.0 = Next(next, Promise::new());
                     } else {
-                        *transition = Started;
+                        transition.0 = Started;
                     }
                 }
                 promise.set(result);
@@ -145,23 +140,38 @@ pub fn transition<B: Behavior>(
                 if let Some(next) = current.stopped() {
                     let value = push(&mut current, next, memory, &mut events);
                     if value.is_ok() {
-                        *transition = Started;
+                        transition.0 = Started;
                     }
                 } else if pop(&mut current, memory, &mut events) {
-                    *transition = Resumed;
+                    transition.0 = Resumed;
                 }
             }
             Reset => {
                 if reset(&mut current, memory, &mut events) {
-                    *transition = Resumed;
+                    transition.0 = Resumed;
                 }
             }
             Started | Resumed => {
-                *transition = Stable;
+                transition.0 = Stable;
             }
             Stable => unreachable!(),
         }
     }
+}
+
+#[derive(Component, Default, Reflect)]
+#[reflect(Component)]
+enum TransitionState<B: Behavior> {
+    Stable,
+    #[default]
+    Started,
+    Resumed,
+    #[reflect(ignore)]
+    Next(B, #[reflect(ignore)] Promise<TransitionResult<B>>),
+    #[reflect(ignore)]
+    Previous,
+    #[reflect(ignore)]
+    Reset,
 }
 
 fn push<B: Behavior>(

@@ -194,9 +194,9 @@ impl<B: Behavior + FromReflect + TypePath + GetTypeRegistration> RegisterableBeh
 /// A [`Bundle`] which contains a [`Behavior`] and other required components for it to function.
 #[derive(Bundle, Default)]
 pub struct BehaviorBundle<B: Behavior> {
-    behavior: B,
-    memory: Memory<B>,
-    transition: Transition<B>,
+    pub behavior: B,
+    pub memory: Memory<B>,
+    pub transition: Transition<B>,
 }
 
 impl<B: Behavior + Clone> Clone for BehaviorBundle<B> {
@@ -218,7 +218,7 @@ impl<B: Behavior> BehaviorBundle<B> {
         Self {
             behavior,
             memory: Memory::default(),
-            transition: Transition::Started, // Initial Behavior
+            transition: Transition::default(),
         }
     }
 
