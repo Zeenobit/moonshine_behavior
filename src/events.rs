@@ -13,7 +13,7 @@ pub struct BehaviorEventWriter<'w, B: Behavior> {
     stopped: Option<ResMut<'w, Events<StoppedEvent<B>>>>,
 }
 
-impl<'w, B: Behavior> BehaviorEventWriter<'w, B> {
+impl<B: Behavior> BehaviorEventWriter<'_, B> {
     pub(crate) fn send_started(&mut self, instance: Instance<B>) {
         if let Some(started) = &mut self.started {
             started.send(StartedEvent { instance });

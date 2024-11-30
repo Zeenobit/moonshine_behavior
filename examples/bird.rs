@@ -75,10 +75,10 @@ enum Action {
 // Spawn a Bird and setup UI.
 fn setup(mut commands: Commands) {
     commands.spawn(BehaviorBundle::<Bird>::default());
-    commands.spawn(Camera2dBundle::default());
+    commands.spawn(Camera2d);
     commands
-        .spawn(NodeBundle {
-            style: Style {
+        .spawn((
+            Node {
                 width: Val::Percent(100.),
                 height: Val::Percent(100.),
                 flex_direction: FlexDirection::Column,
@@ -86,47 +86,35 @@ fn setup(mut commands: Commands) {
                 padding: UiRect::all(Val::Px(20.)),
                 ..Default::default()
             },
-            background_color: BackgroundColor(bevy::color::palettes::css::GRAY.into()),
-            ..Default::default()
-        })
+            BackgroundColor(bevy::color::palettes::css::GRAY.into()),
+        ))
         .with_children(|root| {
-            root.spawn(TextBundle {
-                text: Text::from_section(
-                    HELP_TEXT,
-                    TextStyle {
-                        font_size: 20.,
-                        color: Color::WHITE,
-                        ..default()
-                    },
-                ),
-                style: Style {
+            root.spawn((
+                Text::new(HELP_TEXT),
+                Node {
                     margin: UiRect::bottom(Val::Px(20.)),
                     ..default()
                 },
-                ..default()
-            });
+                TextFont {
+                    font_size: 20.0,
+                    ..default()
+                },
+                TextColor(Color::WHITE),
+            ));
             root.spawn((
                 Message,
-                TextBundle {
-                    text: Text::from_section(
-                        "",
-                        TextStyle {
-                            font_size: 25.,
-                            color: Color::WHITE,
-                            ..default()
-                        },
-                    ),
+                Text::new(""),
+                TextFont {
+                    font_size: 25.0,
                     ..default()
                 },
+                TextColor(Color::WHITE),
             ));
-            root.spawn(NodeBundle {
-                style: Style {
-                    width: Val::Percent(100.),
-                    height: Val::Percent(100.),
-                    flex_direction: FlexDirection::Row,
-                    align_items: AlignItems::Start,
-                    ..default()
-                },
+            root.spawn(Node {
+                width: Val::Percent(100.),
+                height: Val::Percent(100.),
+                flex_direction: FlexDirection::Row,
+                align_items: AlignItems::Start,
                 ..default()
             })
             .with_children(|parent| {
@@ -147,7 +135,7 @@ fn update_text(
     use Bird::*;
     if let Ok((bird, previous)) = query.get_single() {
         let mut text = message.single_mut();
-        text.sections[0].value = match bird {
+        text.0 = match bird {
             Idle => "Bird is idle.",
             Fly => "Bird is flying.",
             Sleep => "Bird is sleeping.",
@@ -211,27 +199,22 @@ fn spawn_button(parent: &mut ChildBuilder, text: impl Into<String>, action: Acti
     parent
         .spawn((
             action,
-            ButtonBundle {
-                background_color: bevy::color::palettes::css::DARK_GRAY.into(),
-                style: Style {
-                    margin: UiRect::all(Val::Px(5.)),
-                    padding: UiRect::new(Val::Px(10.), Val::Px(10.), Val::Px(5.), Val::Px(5.)),
-                    ..default()
-                },
+            Button,
+            BackgroundColor(bevy::color::palettes::css::DARK_GRAY.into()),
+            Node {
+                margin: UiRect::all(Val::Px(5.)),
+                padding: UiRect::new(Val::Px(10.), Val::Px(10.), Val::Px(5.), Val::Px(5.)),
                 ..default()
             },
         ))
         .with_children(|fly_button| {
-            fly_button.spawn(TextBundle {
-                text: Text::from_section(
-                    text,
-                    TextStyle {
-                        font_size: 20.,
-                        color: Color::WHITE,
-                        ..default()
-                    },
-                ),
-                ..default()
-            });
+            fly_button.spawn((
+                Text::new(text),
+                TextFont {
+                    font_size: 20.0,
+                    ..default()
+                },
+                TextColor(Color::WHITE),
+            ));
         });
 }

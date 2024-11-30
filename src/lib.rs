@@ -4,7 +4,7 @@ use std::fmt::Debug;
 
 use bevy_app::App;
 use bevy_ecs::prelude::*;
-use bevy_reflect::{FromReflect, GetTypeRegistration, TypePath};
+use bevy_reflect::{FromReflect, GetTypeRegistration, Typed};
 use moonshine_util::future::Future;
 
 pub mod prelude {
@@ -73,7 +73,7 @@ pub fn behavior_events_plugin<B: Behavior>(app: &mut App) {
 /// impl Behavior for Bird {
 ///     fn allows_next(&self, next: &Self) -> bool {
 ///         use Bird::*;
-///         match (self, next) {
+///         match self {
 ///             // Bird may Fly or Sleep when Idle:
 ///             Idle => matches!(next, Fly | Sleep),
 ///             // Bird may Chirp when Flying:
@@ -119,14 +119,19 @@ pub fn behavior_events_plugin<B: Behavior>(app: &mut App) {
 /// use bevy::prelude::*;
 /// use moonshine_behavior::prelude::*;
 ///
-/// #[derive(Component, Default, Debug, Reflect)]
+/// #[derive(Component,  Debug, Reflect)]
 /// #[reflect(Component)]
 /// enum Bird {
-///     #[default]
 ///     Idle(Wait),
 ///     Fly(WingState),
 ///     Sleep(Wait),
 ///     Chirp,
+/// }
+///
+/// impl Default for Bird {
+///    fn default() -> Self {
+///       Bird::Idle(Wait::default())
+///    }
 /// }
 ///
 /// #[derive(Default, Debug, Reflect)]
@@ -134,6 +139,7 @@ pub fn behavior_events_plugin<B: Behavior>(app: &mut App) {
 ///
 /// #[derive(Default, Debug, Reflect)]
 /// enum WingState {
+///     #[default]
 ///     Up,
 ///     Down,
 /// }
@@ -179,9 +185,9 @@ pub trait Behavior: Component + Debug + Sized {
 }
 
 #[doc(hidden)]
-pub trait RegisterableBehavior: Behavior + FromReflect + TypePath + GetTypeRegistration {}
+pub trait RegisterableBehavior: Behavior + FromReflect + GetTypeRegistration + Typed {}
 
-impl<B: Behavior + FromReflect + TypePath + GetTypeRegistration> RegisterableBehavior for B {}
+impl<B: Behavior + FromReflect + GetTypeRegistration + Typed> RegisterableBehavior for B {}
 
 /// A [`Bundle`] which contains a [`Behavior`] and other required components for it to function.
 #[derive(Bundle, Default)]

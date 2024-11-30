@@ -40,12 +40,14 @@ fn initial() {
     assert_eq!(*a.world().get::<B>(e).unwrap(), S0);
     assert!(a
         .world_mut()
-        .run_system_once(|q: Query<&Transition<B>>| { q.single().is_started() }));
+        .run_system_once(|q: Query<&Transition<B>>| { q.single().is_started() })
+        .unwrap());
 
     a.update();
     assert!(a
         .world_mut()
-        .run_system_once(|q: Query<&Transition<B>>| { q.single().is_stable() }));
+        .run_system_once(|q: Query<&Transition<B>>| { q.single().is_stable() })
+        .unwrap());
 }
 
 #[test]
@@ -54,18 +56,21 @@ fn push() {
     let e = a.world_mut().spawn(BehaviorBundle::new(S0)).id();
     let r = a
         .world_mut()
-        .run_system_once(|mut q: Query<&mut Transition<B>>| q.single_mut().try_start(S1));
+        .run_system_once(|mut q: Query<&mut Transition<B>>| q.single_mut().try_start(S1))
+        .unwrap();
     a.update();
     assert!(r.poll().unwrap().is_ok());
     assert_eq!(*a.world().get::<B>(e).unwrap(), S1);
     assert!(a
         .world_mut()
-        .run_system_once(|q: Query<&Transition<B>>| { q.single().is_started() }));
+        .run_system_once(|q: Query<&Transition<B>>| { q.single().is_started() })
+        .unwrap());
 
     a.update();
     assert!(a
         .world_mut()
-        .run_system_once(|q: Query<&Transition<B>>| { q.single().is_stable() }));
+        .run_system_once(|q: Query<&Transition<B>>| { q.single().is_stable() })
+        .unwrap());
 }
 
 #[test]
@@ -74,13 +79,15 @@ fn push_fail() {
     let e = a.world_mut().spawn(BehaviorBundle::new(S0)).id();
     let r = a
         .world_mut()
-        .run_system_once(|mut q: Query<&mut Transition<B>>| q.single_mut().try_start(S2));
+        .run_system_once(|mut q: Query<&mut Transition<B>>| q.single_mut().try_start(S2))
+        .unwrap();
     a.update();
     assert!(r.poll().unwrap().is_err());
     assert_eq!(*a.world_mut().get::<B>(e).unwrap(), S0);
     assert!(a
         .world_mut()
-        .run_system_once(|q: Query<&Transition<B>>| { q.single().is_stable() }));
+        .run_system_once(|q: Query<&Transition<B>>| { q.single().is_stable() })
+        .unwrap());
 }
 
 #[test]
@@ -94,17 +101,20 @@ fn pop() {
     a.world_mut()
         .run_system_once(|mut q: Query<&mut Transition<B>>| {
             q.single_mut().stop();
-        });
+        })
+        .unwrap();
     a.update();
     assert_eq!(*a.world().get::<B>(e).unwrap(), S0);
     assert!(a
         .world_mut()
-        .run_system_once(|q: Query<&mut Transition<B>>| { q.single().is_resumed() }));
+        .run_system_once(|q: Query<&mut Transition<B>>| { q.single().is_resumed() })
+        .unwrap());
 
     a.update();
     assert!(a
         .world_mut()
-        .run_system_once(|q: Query<&Transition<B>>| { q.single().is_stable() }));
+        .run_system_once(|q: Query<&Transition<B>>| { q.single().is_stable() })
+        .unwrap());
 }
 
 #[test]
@@ -122,17 +132,20 @@ fn reset() {
     a.world_mut()
         .run_system_once(|mut q: Query<&mut Transition<B>>| {
             q.single_mut().reset();
-        });
+        })
+        .unwrap();
     a.update();
     assert_eq!(*a.world().get::<B>(e).unwrap(), S0);
     assert!(a
         .world_mut()
-        .run_system_once(|q: Query<&Transition<B>>| { q.single().is_resumed() }));
+        .run_system_once(|q: Query<&Transition<B>>| { q.single().is_resumed() })
+        .unwrap());
 
     a.update();
     assert!(a
         .world_mut()
-        .run_system_once(|q: Query<&Transition<B>>| { q.single().is_stable() }));
+        .run_system_once(|q: Query<&Transition<B>>| { q.single().is_stable() })
+        .unwrap());
 }
 
 #[test]
@@ -153,26 +166,31 @@ fn chain() {
     a.world_mut()
         .run_system_once(|mut q: Query<&mut Transition<B>>| {
             q.single_mut().stop();
-        });
+        })
+        .unwrap();
     a.update();
     assert_eq!(*a.world().get::<B>(e).unwrap(), S3);
     assert!(a
         .world_mut()
-        .run_system_once(|q: Query<&Transition<B>>| { q.single().is_started() }));
+        .run_system_once(|q: Query<&Transition<B>>| { q.single().is_started() })
+        .unwrap());
 
     a.update();
     assert_eq!(*a.world().get::<B>(e).unwrap(), S3);
     assert!(a
         .world_mut()
-        .run_system_once(|q: Query<&Transition<B>>| { q.single().is_stable() }));
+        .run_system_once(|q: Query<&Transition<B>>| { q.single().is_stable() })
+        .unwrap());
 
     a.world_mut()
         .run_system_once(|mut q: Query<&mut Transition<B>>| {
             q.single_mut().stop();
-        });
+        })
+        .unwrap();
     a.update();
     assert_eq!(*a.world().get::<B>(e).unwrap(), S2);
     assert!(a
         .world_mut()
-        .run_system_once(|q: Query<&Transition<B>>| { q.single().is_resumed() }));
+        .run_system_once(|q: Query<&Transition<B>>| { q.single().is_resumed() })
+        .unwrap());
 }
