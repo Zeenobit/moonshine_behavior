@@ -1,18 +1,44 @@
 #![doc = include_str!("../README.md")]
 
-use std::fmt::Debug;
+use std::{fmt::Debug, marker::PhantomData};
 
-use bevy_app::App;
+use bevy_app::{App, Plugin};
 use bevy_ecs::prelude::*;
 use bevy_reflect::{FromReflect, GetTypeRegistration, Typed};
 use moonshine_util::future::Future;
 
 pub mod prelude {
     pub use crate::{
-        behavior_plugin, {transition, InvalidTransition, Transition, TransitionResult},
-        {Behavior, BehaviorBundle}, {Paused, Previous, Resumed, Started, Stopped},
+        {transition, InvalidTransition, Transition, TransitionResult},
+        {Behavior, BehaviorBundle, BehaviorPlugin}, {Paused, Previous, Resumed, Started, Stopped},
         {PausedEvent, ResumedEvent, StartedEvent, StoppedEvent},
     };
+}
+
+pub struct BehaviorPlugin<B> {
+    pub send_events: bool,
+    pub marker: PhantomData<B>,
+}
+
+impl<B> Default for BehaviorPlugin<B> {
+    fn default() -> Self {
+        Self {
+            send_events: true,
+            marker: PhantomData,
+        }
+    }
+}
+
+impl<B: RegisterableBehavior> Plugin for BehaviorPlugin<B> {
+    fn build(&self, app: &mut App) {
+        app.register_type::<Memory<B>>()
+            .register_type::<Transition<B>>();
+
+        if self.send_events {
+            #[allow(deprecated)]
+            behavior_events_plugin::<B>(app);
+        }
+    }
 }
 
 /// Returns a [`Plugin`] which registers the given [`Behavior`] with the [`App`].
@@ -28,10 +54,9 @@ pub mod prelude {
 ///
 /// [`Reflect`]: bevy_reflect::Reflect
 /// [`transition`]: crate::transition::transition
+#[deprecated(since = "0.1.6", note = "use `BehaviorPlugin` instead")]
 pub fn behavior_plugin<B: RegisterableBehavior>(app: &mut App) {
-    app.add_plugins(behavior_events_plugin::<B>)
-        .register_type::<Memory<B>>()
-        .register_type::<Transition<B>>();
+    app.add_plugins(BehaviorPlugin::<B>::default());
 }
 
 /// Returns a [`Plugin`] which adds the [`Behavior`] events to the [`App`].
@@ -45,6 +70,7 @@ pub fn behavior_plugin<B: RegisterableBehavior>(app: &mut App) {
 /// For behaviors which do support reflection, prefer to use [`behavior_plugin`] instead.
 ///
 /// [`transition`]: crate::transition::transition
+#[deprecated(since = "0.1.6", note = "use `BehaviorPlugin` instead")]
 pub fn behavior_events_plugin<B: Behavior>(app: &mut App) {
     app.add_event::<StartedEvent<B>>()
         .add_event::<PausedEvent<B>>()
