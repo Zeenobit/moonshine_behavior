@@ -74,7 +74,7 @@ enum Action {
 
 // Spawn a Bird and setup UI.
 fn setup(mut commands: Commands) {
-    commands.spawn(BehaviorBundle::<Bird>::default());
+    commands.spawn((Bird::Idle, Transition::<Bird>::default()));
     commands.spawn(Camera2d);
     commands
         .spawn((

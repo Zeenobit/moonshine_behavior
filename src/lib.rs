@@ -1,5 +1,17 @@
 #![doc = include_str!("../README.md")]
 
+pub mod prelude {
+    pub use crate::{
+        {transition, InvalidTransition, Transition, TransitionResult}, {Behavior, BehaviorPlugin},
+        {Paused, Previous, Resumed, Started, Stopped},
+        {PausedEvent, ResumedEvent, StartedEvent, StoppedEvent},
+    };
+}
+
+mod events;
+mod memory;
+mod transition;
+
 use std::{fmt::Debug, marker::PhantomData};
 
 use bevy_app::{App, Plugin};
@@ -7,13 +19,9 @@ use bevy_ecs::prelude::*;
 use bevy_reflect::{FromReflect, GetTypeRegistration, Typed};
 use moonshine_util::future::Future;
 
-pub mod prelude {
-    pub use crate::{
-        {transition, InvalidTransition, Transition, TransitionResult},
-        {Behavior, BehaviorBundle, BehaviorPlugin}, {Paused, Previous, Resumed, Started, Stopped},
-        {PausedEvent, ResumedEvent, StartedEvent, StoppedEvent},
-    };
-}
+pub use events::*;
+pub use memory::*;
+pub use transition::*;
 
 pub struct BehaviorPlugin<B> {
     pub send_events: bool,
@@ -217,6 +225,7 @@ impl<B: Behavior + FromReflect + GetTypeRegistration + Typed> RegisterableBehavi
 
 /// A [`Bundle`] which contains a [`Behavior`] and other required components for it to function.
 #[derive(Bundle, Default)]
+#[deprecated(since = "0.1.6", note = "use `#[require(Transition::<B>)]` instead")]
 pub struct BehaviorBundle<B: Behavior> {
     pub behavior: B,
     pub memory: Memory<B>,
@@ -259,11 +268,3 @@ impl<B: Behavior> From<B> for BehaviorBundle<B> {
         Self::new(behavior)
     }
 }
-
-mod events;
-mod memory;
-mod transition;
-
-pub use events::*;
-pub use memory::*;
-pub use transition::*;

@@ -13,12 +13,23 @@ use TransitionState::*;
 
 /// A [`Component`] which stores the transition state of a [`Behavior`].
 #[derive(Component, Reflect)]
+#[require(Memory::<B>)]
 #[reflect(Component)]
 pub struct Transition<B: Behavior>(TransitionState<B>);
 
 impl<B: Behavior> Default for Transition<B> {
     fn default() -> Self {
         Self(TransitionState::default())
+    }
+}
+
+impl<B: Behavior> Clone for Transition<B> {
+    fn clone(&self) -> Self {
+        if self.is_started() {
+            Self(Started)
+        } else {
+            panic!("cannot clone transition after initialization: {self:?}")
+        }
     }
 }
 
@@ -96,12 +107,15 @@ impl<B: Behavior> fmt::Debug for Transition<B> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use TransitionState::*;
         match &self.0 {
-            Stable => write!(f, "Stable"),
-            Started => write!(f, "Started"),
-            Resumed => write!(f, "Resumed"),
-            Next(next, ..) => f.debug_tuple("Next").field(next).finish(),
-            Previous => write!(f, "Previous"),
-            Reset => write!(f, "Reset"),
+            Stable => write!(f, "Transition::<{}>::Stable", B::debug_name()),
+            Started => write!(f, "Transition::<{}>::Started", B::debug_name()),
+            Resumed => write!(f, "Transition::<{}>::Resumed", B::debug_name()),
+            Next(next, ..) => f
+                .debug_tuple(format!("Transition::<{}>::Next", B::debug_name()).as_str())
+                .field(next)
+                .finish(),
+            Previous => write!(f, "Transition::<{}>::Previous", B::debug_name()),
+            Reset => write!(f, "Transition::<{}>::Reset", B::debug_name()),
         }
     }
 }
