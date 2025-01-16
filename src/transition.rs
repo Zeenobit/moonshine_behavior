@@ -34,7 +34,15 @@ impl<B: Behavior> Clone for Transition<B> {
 }
 
 impl<B: Behavior> Transition<B> {
-    pub(crate) fn next(next: B) -> (Self, Future<TransitionResult<B>>) {
+    pub fn next(next: B) -> Self {
+        Self::next_internal(next).0
+    }
+
+    pub fn previous() -> Self {
+        Self(TransitionState::Previous)
+    }
+
+    pub(crate) fn next_internal(next: B) -> (Self, Future<TransitionResult<B>>) {
         let (promise, future) = Promise::start();
         let state = TransitionState::Next(next, promise);
         (Self(state), future)
@@ -61,7 +69,7 @@ impl<B: Behavior> Transition<B> {
     }
 
     pub fn try_start(&mut self, behavior: B) -> Future<TransitionResult<B>> {
-        let (new, future) = Self::next(behavior);
+        let (new, future) = Self::next_internal(behavior);
         let old = mem::replace(self, new);
         if old.is_suspending() {
             warn!("transition override: {old:?} -> {self:?}");

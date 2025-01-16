@@ -257,7 +257,7 @@ impl<B: Behavior> BehaviorBundle<B> {
 
     /// Tries to start the given [`Behavior`] as the next one immediately after insertion.
     pub fn try_start(&mut self, next: B) -> Future<TransitionResult<B>> {
-        let (transition, future) = Transition::next(next);
+        let (transition, future) = Transition::next_internal(next);
         self.transition = transition;
         future
     }
