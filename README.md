@@ -124,41 +124,9 @@ To spawn a bird with a specific initial behavior use `BehaviorBundle::<B>::new()
 
 ### Transitions
 
-An entity spawned with a `BehaviorBundle` may be queried using `BehaviorRef` and `BehaviorMut` world queries.
+TODO: Need up to date documentation.
 
-- `BehaviorRef` may be used to read the current/previous behaviors.
-- `BehaviorMut` may be used to read the current/previous behaviors and request behavior transitions.
-
-To access current behavior, use `Deref`/`DerefMut` or `get`/`get_mut` on either `BehaviorRef` or `BehaviorMut`. To access previous behavior, use `.previous()`.
-
-For example:
-```rust,ignore
-fn is_chirping_while_flying(bird: Query<BehaviorRef<Bird>>) -> bool {
-    let behavior = bird.single();
-    matches!(*behavior, Chirp) && matches!(behavior.previous(), Some(Fly))
-}
-```
-
-To start some next behavior, use `.try_start()`:
-```rust,ignore
-fn chirp(mut bird: Query<BehaviorMut<Bird>>) {
-    bird.single_mut().try_start(Chirp);
-}
-```
-
-To stop current behavior and resume the previous behavior, use `.stop()`:
-```rust,ignore
-fn stop(mut bird: Query<BehaviorMut<Bird>>) {
-    bird.single_mut().stop();
-}
-```
-
-To stop current behavior and resume the initial behavior, use `.reset()`:
-```rust,ignore
-fn reset(mut bird: Query<BehaviorMut<Bird>>) {
-    bird.single_mut().reset();
-}
-```
+See [transition.rs](examples/transitions.rs) for examples.
 
 When a transition is requested, it is not invoked immediately. Instead, it is invoked whenever the registered `transition()` system is run.
 You may register your systems before or after `transition()` to perform any logic as required.
