@@ -11,7 +11,9 @@ use crate::{Behavior, BehaviorEventWriter, Memory};
 
 use TransitionState::*;
 
-/// A [`Component`] which stores the transition state of a [`Behavior`].
+/// A [`Component`] which controls the state of a [`Behavior`].
+///
+/// Insert this with your behavior component (`#[require(Transition<B>)]` works too!) to control and query its state.
 #[derive(Component, Reflect)]
 #[require(Memory::<B>)]
 #[reflect(Component)]
@@ -36,10 +38,6 @@ impl<B: Behavior> Clone for Transition<B> {
 impl<B: Behavior> Transition<B> {
     pub fn next(next: B) -> Self {
         Self::next_internal(next).0
-    }
-
-    pub fn previous() -> Self {
-        Self(TransitionState::Previous)
     }
 
     pub(crate) fn next_internal(next: B) -> (Self, Future<TransitionResult<B>>) {

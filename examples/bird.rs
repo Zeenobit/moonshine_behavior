@@ -34,6 +34,7 @@ fn main() {
 
 // Define Bird behavior as an enum with all of its possible states.
 #[derive(Component, Default, Debug, Reflect)]
+#[require(Transition<Bird>)] // <-- You need this to control the behavior.
 #[reflect(Component)]
 enum Bird {
     #[default]
@@ -74,7 +75,7 @@ enum Action {
 
 // Spawn a Bird and setup UI.
 fn setup(mut commands: Commands) {
-    commands.spawn((Bird::Idle, Transition::<Bird>::default()));
+    commands.spawn(Bird::Idle);
     commands.spawn(Camera2d);
     commands
         .spawn((
