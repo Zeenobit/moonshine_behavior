@@ -2,10 +2,13 @@
 
 pub mod prelude {
     pub use crate::{
-        {transition, InvalidTransition, Transition, TransitionResult}, {Behavior, BehaviorPlugin},
+        {transition, Controller, InvalidTransition, TransitionResult}, {Behavior, BehaviorPlugin},
         {Paused, Previous, Resumed, Started, Stopped},
         {PausedEvent, ResumedEvent, StartedEvent, StoppedEvent},
     };
+
+    #[deprecated(since = "0.1.6", note = "use `Controller<B>` instead")]
+    pub type Transition<B> = Controller<B>;
 }
 
 mod events;
@@ -40,7 +43,7 @@ impl<B> Default for BehaviorPlugin<B> {
 impl<B: RegisterableBehavior> Plugin for BehaviorPlugin<B> {
     fn build(&self, app: &mut App) {
         app.register_type::<Memory<B>>()
-            .register_type::<Transition<B>>();
+            .register_type::<Controller<B>>();
 
         if self.send_events {
             #[allow(deprecated)]
@@ -229,7 +232,7 @@ impl<B: Behavior + FromReflect + GetTypeRegistration + Typed> RegisterableBehavi
 pub struct BehaviorBundle<B: Behavior> {
     pub behavior: B,
     pub memory: Memory<B>,
-    pub transition: Transition<B>,
+    pub transition: Controller<B>,
 }
 
 impl<B: Behavior + Clone> Clone for BehaviorBundle<B> {
@@ -251,13 +254,13 @@ impl<B: Behavior> BehaviorBundle<B> {
         Self {
             behavior,
             memory: Memory::default(),
-            transition: Transition::default(),
+            transition: Controller::default(),
         }
     }
 
     /// Tries to start the given [`Behavior`] as the next one immediately after insertion.
     pub fn try_start(&mut self, next: B) -> Future<TransitionResult<B>> {
-        let (transition, future) = Transition::next_internal(next);
+        let (transition, future) = Controller::next_internal(next);
         self.transition = transition;
         future
     }

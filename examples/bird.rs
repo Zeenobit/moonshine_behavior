@@ -34,7 +34,7 @@ fn main() {
 
 // Define Bird behavior as an enum with all of its possible states.
 #[derive(Component, Default, Debug, Reflect)]
-#[require(Transition<Bird>)] // <-- You need this to control the behavior.
+#[require(Controller<Bird>)] // <-- You need this to control the behavior.
 #[reflect(Component)]
 enum Bird {
     #[default]
@@ -178,7 +178,7 @@ fn update_buttons(
 // Modify the Bird behavior based on button clicks.
 fn on_button_clicked(
     query: Query<(&Action, &Interaction), Changed<Interaction>>,
-    mut bird: Query<&mut Transition<Bird>>,
+    mut bird: Query<&mut Controller<Bird>>,
 ) {
     use Bird::*;
     let mut transition = bird.single_mut();

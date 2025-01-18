@@ -9,53 +9,59 @@ use moonshine_util::future::{Future, Promise};
 
 use crate::{Behavior, BehaviorEventWriter, Memory};
 
-use TransitionState::*;
+use Transition::*;
 
 /// A [`Component`] which controls the state of a [`Behavior`].
 ///
-/// Insert this with your behavior component (`#[require(Transition<B>)]` works too!) to control and query its state.
+/// Insert this with your behavior component (`#[require(Controller<B>)]` works too!) to control and query its state.
 #[derive(Component, Reflect)]
 #[require(Memory::<B>)]
 #[reflect(Component)]
-pub struct Transition<B: Behavior>(TransitionState<B>);
+pub struct Controller<B: Behavior> {
+    transition: Transition<B>,
+}
 
-impl<B: Behavior> Default for Transition<B> {
+impl<B: Behavior> Default for Controller<B> {
     fn default() -> Self {
-        Self(TransitionState::default())
+        Self {
+            transition: Transition::default(),
+        }
     }
 }
 
-impl<B: Behavior> Clone for Transition<B> {
+impl<B: Behavior> Clone for Controller<B> {
     fn clone(&self) -> Self {
         if self.is_started() {
-            Self(Started)
+            Self {
+                transition: Started,
+            }
         } else {
             panic!("cannot clone transition after initialization: {self:?}")
         }
     }
 }
 
-impl<B: Behavior> Transition<B> {
+impl<B: Behavior> Controller<B> {
     pub fn next(next: B) -> Self {
         Self::next_internal(next).0
     }
 
     pub(crate) fn next_internal(next: B) -> (Self, Future<TransitionResult<B>>) {
         let (promise, future) = Promise::start();
-        let state = TransitionState::Next(next, promise);
-        (Self(state), future)
+        let transition = Transition::Next(next, promise);
+        (Self { transition }, future)
     }
 
     pub fn is_started(&self) -> bool {
-        matches!(self.0, Started)
+        matches!(self.transition, Started)
     }
 
     pub fn is_resumed(&self) -> bool {
-        matches!(self.0, Resumed)
+        matches!(self.transition, Resumed)
     }
 
     pub fn is_stable(&self) -> bool {
-        matches!(self.0, Stable)
+        matches!(self.transition, Stable)
     }
 
     pub fn is_activated(&self) -> bool {
@@ -63,7 +69,7 @@ impl<B: Behavior> Transition<B> {
     }
 
     pub fn is_suspending(&self) -> bool {
-        matches!(self.0, Next(..) | Previous | Reset)
+        matches!(self.transition, Next(..) | Previous | Reset)
     }
 
     pub fn try_start(&mut self, behavior: B) -> Future<TransitionResult<B>> {
@@ -76,43 +82,51 @@ impl<B: Behavior> Transition<B> {
     }
 
     pub fn stop(&mut self) {
-        let old = Self(mem::replace(&mut self.0, Previous));
+        let old = Self {
+            transition: mem::replace(&mut self.transition, Previous),
+        };
         if old.is_suspending() {
             warn!("transition override: {old:?} -> {self:?}");
         }
     }
 
     pub fn reset(&mut self) {
-        let old = Self(mem::replace(&mut self.0, Reset));
+        let old = Self {
+            transition: mem::replace(&mut self.transition, Reset),
+        };
         if old.is_suspending() {
             warn!("transition override: {old:?} -> {self:?}");
         }
     }
 
     fn take(&mut self) -> Self {
-        Self(mem::replace(&mut self.0, Stable))
+        Self {
+            transition: mem::replace(&mut self.transition, Stable),
+        }
     }
 
     pub(crate) fn clone(&self) -> Self
     where
         B: Clone,
     {
-        use TransitionState::*;
-        Self(match &self.0 {
-            Stable => Stable,
-            Started => Started,
-            Resumed => Resumed,
-            Next(next, ..) => Next(next.clone(), Promise::new()),
-            Previous => Previous,
-            Reset => Reset,
-        })
+        use Transition::*;
+        Self {
+            transition: match &self.transition {
+                Stable => Stable,
+                Started => Started,
+                Resumed => Resumed,
+                Next(next, ..) => Next(next.clone(), Promise::new()),
+                Previous => Previous,
+                Reset => Reset,
+            },
+        }
     }
 }
 
-impl<B: Behavior> fmt::Debug for Transition<B> {
+impl<B: Behavior> fmt::Debug for Controller<B> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use TransitionState::*;
-        match &self.0 {
+        use Transition::*;
+        match &self.transition {
             Stable => write!(f, "Transition::<{}>::Stable", B::debug_name()),
             Started => write!(f, "Transition::<{}>::Started", B::debug_name()),
             Resumed => write!(f, "Transition::<{}>::Resumed", B::debug_name()),
@@ -133,25 +147,25 @@ pub struct InvalidTransition<B: Behavior>(pub B);
 
 /// A [`System`] which triggers [`Behavior`] transitions.
 pub fn transition<B: Behavior>(
-    mut query: Query<(InstanceMut<B>, &mut Memory<B>, &mut Transition<B>)>,
+    mut query: Query<(InstanceMut<B>, &mut Memory<B>, &mut Controller<B>)>,
     mut events: BehaviorEventWriter<B>,
 ) {
     for (mut current, memory, mut transition) in &mut query {
-        use TransitionState::*;
+        use Transition::*;
 
         if transition.is_stable() {
             // Do not mutate the transition if stable
             continue;
         }
 
-        match transition.take().0 {
+        match transition.take().transition {
             Next(next, promise) => {
                 let result = push(&mut current, next, memory, &mut events);
                 if result.is_ok() {
                     if let Some(next) = current.started() {
-                        transition.0 = Next(next, Promise::new());
+                        transition.transition = Next(next, Promise::new());
                     } else {
-                        transition.0 = Started;
+                        transition.transition = Started;
                     }
                 }
                 promise.set(result);
@@ -160,19 +174,19 @@ pub fn transition<B: Behavior>(
                 if let Some(next) = current.stopped() {
                     let value = push(&mut current, next, memory, &mut events);
                     if value.is_ok() {
-                        transition.0 = Started;
+                        transition.transition = Started;
                     }
                 } else if pop(&mut current, memory, &mut events) {
-                    transition.0 = Resumed;
+                    transition.transition = Resumed;
                 }
             }
             Reset => {
                 if reset(&mut current, memory, &mut events) {
-                    transition.0 = Resumed;
+                    transition.transition = Resumed;
                 }
             }
             Started | Resumed => {
-                transition.0 = Stable;
+                transition.transition = Stable;
             }
             Stable => unreachable!(),
         }
@@ -181,7 +195,7 @@ pub fn transition<B: Behavior>(
 
 #[derive(Component, Default, Reflect)]
 #[reflect(Component)]
-enum TransitionState<B: Behavior> {
+enum Transition<B: Behavior> {
     Stable,
     #[default]
     Started,

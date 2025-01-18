@@ -8,7 +8,7 @@ fn main() {
 }
 
 #[derive(Component, Debug, Reflect)]
-#[require(Transition<Bird>)]
+#[require(Controller<Bird>)]
 enum Bird {
     Idle { elapsed: Duration },
     Fly { duration: Duration },
@@ -39,20 +39,20 @@ fn spawn_birds(mut commands: Commands) {
         Bird::Idle {
             elapsed: Duration::ZERO,
         },
-        Transition::next(Bird::Fly {
+        Controller::next(Bird::Fly {
             duration: Duration::from_secs(5),
         }),
     ));
 }
 
 // Idle birds chirp every 5 seconds:
-fn bird_idle(time: Res<Time>, mut query: Query<(Entity, &mut Bird, &mut Transition<Bird>)>) {
-    for (entity, mut bird, mut transition) in &mut query {
+fn bird_idle(time: Res<Time>, mut query: Query<(Entity, &mut Bird, &mut Controller<Bird>)>) {
+    for (entity, mut bird, mut controller) in &mut query {
         let Bird::Idle { elapsed } = bird.as_mut() else {
             continue;
         };
 
-        if transition.is_started() || transition.is_resumed() {
+        if controller.is_started() || controller.is_resumed() {
             info!("Bird {entity} is idle!");
         }
 
@@ -62,7 +62,7 @@ fn bird_idle(time: Res<Time>, mut query: Query<(Entity, &mut Bird, &mut Transiti
         }
 
         // The transition will happen before the next update.
-        let future_result = transition.try_start(Bird::Chirp);
+        let future_result = controller.try_start(Bird::Chirp);
 
         // You can either poll the result (mainly useful for diagnostics), or just forget about it!
         // Behavior transitions only fail if `Behavior::allows_next` returns false.
@@ -72,27 +72,27 @@ fn bird_idle(time: Res<Time>, mut query: Query<(Entity, &mut Bird, &mut Transiti
     }
 }
 
-fn bird_chirp(mut query: Query<(Entity, &Bird, &mut Transition<Bird>)>) {
-    for (entity, bird, mut transition) in &mut query {
+fn bird_chirp(mut query: Query<(Entity, &Bird, &mut Controller<Bird>)>) {
+    for (entity, bird, mut controller) in &mut query {
         let Bird::Chirp = bird else {
             continue;
         };
 
-        if transition.is_started() {
+        if controller.is_started() {
             info!("Bird {entity} chirps!");
         }
 
-        transition.stop();
+        controller.stop();
     }
 }
 
-fn bird_fly(time: Res<Time>, mut query: Query<(Entity, &mut Bird, &mut Transition<Bird>)>) {
-    for (entity, mut bird, mut transition) in &mut query {
+fn bird_fly(time: Res<Time>, mut query: Query<(Entity, &mut Bird, &mut Controller<Bird>)>) {
+    for (entity, mut bird, mut controller) in &mut query {
         let Bird::Fly { duration } = bird.as_mut() else {
             continue;
         };
 
-        if transition.is_started() {
+        if controller.is_started() {
             info!("Bird {entity} flies!");
         }
 
@@ -100,7 +100,7 @@ fn bird_fly(time: Res<Time>, mut query: Query<(Entity, &mut Bird, &mut Transitio
 
         // Stop flying
         if duration.is_zero() {
-            transition.stop();
+            controller.stop();
             continue;
         }
     }
