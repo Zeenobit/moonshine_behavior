@@ -48,6 +48,10 @@ pub fn transition<T: Behavior>(
     mut query: Query<(Instance<T>, BehaviorMut<T>, Option<&mut Sequence<T>>), TransitionChanged<T>>,
 ) {
     for (instance, mut behavior, sequence_opt) in &mut query {
+        if behavior.current.is_added() {
+            events.start(instance);
+        }
+
         match behavior.transition.take() {
             Next(next) => {
                 behavior.push(instance, next, &mut events);
@@ -74,7 +78,7 @@ pub enum TransitionError<T: Behavior> {
 
 pub type TransitionResult<T> = Result<(), TransitionError<T>>;
 
-#[derive(Component, Default, Reflect)]
+#[derive(Component, Reflect)]
 #[reflect(Component)]
 pub struct TransitionResponse<T: Behavior> {
     result: Option<TransitionResult<T>>,
@@ -92,5 +96,11 @@ impl<T: Behavior> TransitionResponse<T> {
 
     pub(crate) fn set(&mut self, result: TransitionResult<T>) {
         self.result = Some(result);
+    }
+}
+
+impl<T: Behavior> Default for TransitionResponse<T> {
+    fn default() -> Self {
+        Self { result: None }
     }
 }
