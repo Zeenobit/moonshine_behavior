@@ -17,3 +17,4 @@ moonshine-kind = { version = "0.2.*", path = "../core/crates/kind" }
 
 [dev-dependencies]
 bevy = "0.15.*"
+bevy_vector_shapes = "0.9.*"
