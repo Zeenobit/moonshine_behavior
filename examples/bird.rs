@@ -34,7 +34,6 @@ fn main() {
 
 // Define Bird behavior as an enum with all of its possible states.
 #[derive(Component, Default, Debug, Reflect)]
-#[require(Controller<Bird>)] // <-- You need this to control the behavior.
 #[reflect(Component)]
 enum Bird {
     #[default]
