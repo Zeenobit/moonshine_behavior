@@ -23,7 +23,7 @@ mod tests;
 
 use std::fmt::Debug;
 use std::mem::{replace, swap};
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 
 use bevy_derive::{Deref, DerefMut};
 use bevy_ecs::{prelude::*, query::QueryData};
@@ -82,7 +82,37 @@ pub struct BehaviorMut<T: Behavior> {
     response: Option<&'static mut TransitionResponse<T>>,
 }
 
+impl<T: Behavior> BehaviorMutReadOnlyItem<'_, T> {
+    pub fn current(&self) -> &T {
+        &self.current
+    }
+
+    pub fn previous(&self) -> Option<&T> {
+        self.memory.last()
+    }
+}
+
+impl<T: Behavior> Deref for BehaviorMutReadOnlyItem<'_, T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        self.current()
+    }
+}
+
 impl<T: Behavior> BehaviorMutItem<'_, T> {
+    pub fn current(&self) -> &T {
+        &self.current
+    }
+
+    pub fn current_mut(&mut self) -> &mut T {
+        self.current.as_mut()
+    }
+
+    pub fn previous(&self) -> Option<&T> {
+        self.memory.last()
+    }
+
     pub fn start(&mut self, behavior: T) {
         self.set_transition(Next(behavior));
     }
@@ -164,7 +194,13 @@ impl<T: Behavior> Deref for BehaviorMutItem<'_, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
-        &self.current
+        self.current()
+    }
+}
+
+impl<T: Behavior> DerefMut for BehaviorMutItem<'_, T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.current_mut()
     }
 }
 
