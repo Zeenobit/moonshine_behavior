@@ -1,274 +1,181 @@
-#![doc = include_str!("../README.md")]
-
 pub mod prelude {
-    pub use crate::{
-        {transition, Controller, InvalidTransition, TransitionResult}, {Behavior, BehaviorPlugin},
-        {Paused, Previous, Resumed, Started, Stopped},
-        {PausedEvent, ResumedEvent, StartedEvent, StoppedEvent},
-    };
+    pub use crate::{Behavior, BehaviorMut, BehaviorRef};
 
-    #[deprecated(since = "0.1.6", note = "use `Controller<B>` instead")]
-    pub type Transition<B> = Controller<B>;
+    pub use crate::transition::{transition, Next, Previous, Reset, Transition};
+
+    pub use crate::plugin::BehaviorPlugin;
+
+    pub use crate::events::{Pause, PauseEvents};
+    pub use crate::events::{Resume, ResumeEvents};
+    pub use crate::events::{Start, StartEvents};
+    pub use crate::events::{Stop, StopEvents};
+
+    pub use crate::sequence::Sequence;
 }
 
-mod events;
-mod memory;
-mod transition;
+pub mod events;
+pub mod plugin;
+pub mod sequence;
+pub mod transition;
 
-use std::{fmt::Debug, marker::PhantomData};
+#[cfg(test)]
+mod tests;
 
-use bevy_app::{App, Plugin};
-use bevy_ecs::prelude::*;
-use bevy_reflect::{FromReflect, GetTypeRegistration, Typed};
-use moonshine_util::future::Future;
+use std::fmt::Debug;
+use std::mem::{replace, swap};
+use std::ops::Deref;
 
-pub use events::*;
-pub use memory::*;
-pub use transition::*;
+use bevy_derive::{Deref, DerefMut};
+use bevy_ecs::{prelude::*, query::QueryData};
+use bevy_reflect::prelude::*;
+use bevy_utils::prelude::*;
+use bevy_utils::tracing::{debug, error, warn};
+use events::BehaviorEventsMut;
+use moonshine_kind::prelude::*;
 
-pub struct BehaviorPlugin<B> {
-    pub send_events: bool,
-    pub marker: PhantomData<B>,
-}
+use self::transition::*;
 
-impl<B> Default for BehaviorPlugin<B> {
-    fn default() -> Self {
-        Self {
-            send_events: true,
-            marker: PhantomData,
+pub trait Behavior: Component + Debug {
+    fn allows_next(&self, next: &Self) -> bool {
+        match (self, next) {
+            _ => true,
         }
     }
-}
 
-impl<B: RegisterableBehavior> Plugin for BehaviorPlugin<B> {
-    fn build(&self, app: &mut App) {
-        app.register_type::<Memory<B>>()
-            .register_type::<Controller<B>>()
-            .register_required_components::<B, Controller<B>>();
-
-        if self.send_events {
-            #[allow(deprecated)]
-            behavior_events_plugin::<B>(app);
-        }
-    }
-}
-
-/// Returns a [`Plugin`] which registers the given [`Behavior`] with the [`App`].
-///
-/// # Usage
-/// Add this plugin to your application during initialization for every behavior.
-///
-/// This plugin is required for behavior transition events to be sent at runtime.
-/// Without it, the [`transition`] system will [`panic`].
-///
-/// This plugin requires the behavior to support reflection (see [`Reflect`]).
-/// If `B` does not support reflection, use [`behavior_events_plugin`] instead.
-///
-/// [`Reflect`]: bevy_reflect::Reflect
-/// [`transition`]: crate::transition::transition
-#[deprecated(since = "0.1.6", note = "use `BehaviorPlugin` instead")]
-pub fn behavior_plugin<B: RegisterableBehavior>(app: &mut App) {
-    app.add_plugins(BehaviorPlugin::<B>::default());
-}
-
-/// Returns a [`Plugin`] which adds the [`Behavior`] events to the [`App`].
-///
-/// # Usage
-/// Add this plugin to your application during initialization for every behavior which does not support reflection.
-///
-/// This plugin is required for behavior transition events to be sent at runtime.
-/// Without it, the [`transition`] system will [`panic`].
-///
-/// For behaviors which do support reflection, prefer to use [`behavior_plugin`] instead.
-///
-/// [`transition`]: crate::transition::transition
-#[deprecated(since = "0.1.6", note = "use `BehaviorPlugin` instead")]
-pub fn behavior_events_plugin<B: Behavior>(app: &mut App) {
-    app.add_event::<StartedEvent<B>>()
-        .add_event::<PausedEvent<B>>()
-        .add_event::<ResumedEvent<B>>()
-        .add_event::<StoppedEvent<B>>();
-}
-
-/// A [`Component`] which represents some state of its [`Entity`].
-///
-/// # Example
-/// Typically, a behavior is implemented as an `enum` type, which acts like a single state within a state machine:
-/// ```
-/// use bevy::prelude::*;
-/// use moonshine_behavior::prelude::*;
-///
-/// #[derive(Component, Default, Debug, Reflect)]
-/// #[reflect(Component)]
-/// enum Bird {
-///     #[default]
-///     Idle,
-///     Fly,
-///     Sleep,
-///     Chirp
-/// }
-///
-/// impl Behavior for Bird {
-///     fn allows_next(&self, next: &Self) -> bool {
-///         use Bird::*;
-///         match self {
-///             // Bird may Fly or Sleep when Idle:
-///             Idle => matches!(next, Fly | Sleep),
-///             // Bird may Chirp when Flying:
-///             Fly => matches!(next, Chirp),
-///             // Bird must not do anything else if Sleeping or Chirping:
-///             _ => false,
-///         }
-///     }
-/// }
-/// ```
-/// However, a behavior can also be any struct type:
-/// ```
-/// # use bevy::prelude::*;
-/// # use moonshine_behavior::prelude::*;
-///
-/// #[derive(Component, Default, Debug, Reflect)]
-/// #[reflect(Component)]
-/// struct Bird {
-///     fly: bool,
-///     sleep: bool,
-///     chirp: bool,
-/// }
-///
-/// impl Behavior for Bird {
-///     fn allows_next(&self, next: &Self) -> bool {
-///         if self.sleep || self.chirp {
-///             // Bird must not do anything else if Sleeping or Chirping:
-///             false
-///         } else if self.fly {
-///             // Bird may Chirp when Flying:
-///             next.chirp
-///         } else {
-///             // Bird may Fly or Sleep when Idle:
-///             next.fly || next.sleep
-///         }
-///     }
-/// }
-/// ```
-/// You can also combine nested enums and structs to create complex state machines:
-/// ```
-/// use std::time::Duration;
-///
-/// use bevy::prelude::*;
-/// use moonshine_behavior::prelude::*;
-///
-/// #[derive(Component,  Debug, Reflect)]
-/// #[reflect(Component)]
-/// enum Bird {
-///     Idle(Wait),
-///     Fly(WingState),
-///     Sleep(Wait),
-///     Chirp,
-/// }
-///
-/// impl Default for Bird {
-///    fn default() -> Self {
-///       Bird::Idle(Wait::default())
-///    }
-/// }
-///
-/// #[derive(Default, Debug, Reflect)]
-/// struct Wait(Duration);
-///
-/// #[derive(Default, Debug, Reflect)]
-/// enum WingState {
-///     #[default]
-///     Up,
-///     Down,
-/// }
-///
-/// impl Behavior for Bird {
-///     /* ... */
-/// }
-/// ```
-pub trait Behavior: Component + Debug + Sized {
-    /// Returns `true` if some next [`Behavior`] is allowed to be started after this one.
-    ///
-    /// By default, any behavior is allowed to start after any other behavior.
-    fn allows_next(&self, _next: &Self) -> bool {
-        true
-    }
-
-    /// Returns `true` if this [`Behavior`] may be resumed after it has been paused.
-    ///
-    /// By default, all behaviors are resumable.
     fn is_resumable(&self) -> bool {
-        true
-    }
-
-    /// This method is called when the current [`Behavior`] is started.
-    ///
-    /// By default, it does nothing.
-    /// Optionally, it may return the next [`Behavior`] to start immediately after this one.
-    ///
-    /// This allows you to create a chain of behaviors that execute in sequence.
-    fn started(&self) -> Option<Self> {
-        None
-    }
-
-    /// This method is called when the current [`Behavior`] is stopped.
-    ///
-    /// By default, it does nothing.
-    /// Optionally, it may return the next [`Behavior`] to start immediately after this one.
-    ///
-    /// This allows you to create a chain of behaviors that execute in sequence.
-    fn stopped(&self) -> Option<Self> {
-        None
-    }
-}
-
-#[doc(hidden)]
-pub trait RegisterableBehavior: Behavior + FromReflect + GetTypeRegistration + Typed {}
-
-impl<B: Behavior + FromReflect + GetTypeRegistration + Typed> RegisterableBehavior for B {}
-
-/// A [`Bundle`] which contains a [`Behavior`] and other required components for it to function.
-#[derive(Bundle, Default)]
-#[deprecated(since = "0.1.6", note = "use `#[require(Transition::<B>)]` instead")]
-pub struct BehaviorBundle<B: Behavior> {
-    pub behavior: B,
-    pub memory: Memory<B>,
-    pub transition: Controller<B>,
-}
-
-impl<B: Behavior + Clone> Clone for BehaviorBundle<B> {
-    fn clone(&self) -> Self {
-        Self {
-            behavior: self.behavior.clone(),
-            memory: self.memory.clone(),
-            transition: self.transition.clone(),
+        match self {
+            _ => true,
         }
     }
 }
 
-impl<B: Behavior> BehaviorBundle<B> {
-    pub fn new(behavior: B) -> Self {
-        assert!(
-            behavior.is_resumable(),
-            "initial behavior must be resumable"
-        );
-        Self {
-            behavior,
-            memory: Memory::default(),
-            transition: Controller::default(),
-        }
+#[derive(QueryData)]
+pub struct BehaviorRef<T: Behavior> {
+    current: &'static T,
+    memory: &'static Memory<T>,
+}
+
+impl<T: Behavior> BehaviorRefItem<'_, T> {
+    pub fn current(&self) -> &T {
+        &self.current
     }
 
-    /// Tries to start the given [`Behavior`] as the next one immediately after insertion.
-    pub fn try_start(&mut self, next: B) -> Future<TransitionResult<B>> {
-        let (transition, future) = Controller::next_internal(next);
-        self.transition = transition;
-        future
+    pub fn previous(&self) -> Option<&T> {
+        self.memory.last()
     }
 }
 
-impl<B: Behavior> From<B> for BehaviorBundle<B> {
-    fn from(behavior: B) -> Self {
-        Self::new(behavior)
+impl<T: Behavior> Deref for BehaviorRefItem<'_, T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        self.current()
+    }
+}
+
+#[derive(QueryData)]
+#[query_data(mutable)]
+pub struct BehaviorMut<T: Behavior> {
+    current: Mut<'static, T>,
+    memory: &'static mut Memory<T>,
+    transition: &'static mut Transition<T>,
+    response: Option<&'static mut TransitionResponse<T>>,
+}
+
+impl<T: Behavior> BehaviorMutItem<'_, T> {
+    pub fn start(&mut self, behavior: T) {
+        self.set_transition(Next(behavior));
+    }
+
+    pub fn stop(&mut self) {
+        self.set_transition(Previous);
+    }
+
+    pub fn reset(&mut self) {
+        self.set_transition(Reset);
+    }
+
+    fn set_transition(&mut self, transition: Transition<T>) {
+        let previous = replace(self.transition.as_mut(), transition);
+        if !previous.is_none() {
+            warn!("transition override: {previous:?} -> {:?}", self.transition);
+        }
+    }
+
+    fn set_result(&mut self, result: TransitionResult<T>) {
+        if let Some(response) = self.response.as_mut() {
+            response.set(result);
+        }
+    }
+
+    fn push(&mut self, instance: Instance<T>, mut next: T, events: &mut BehaviorEventsMut<T>) {
+        if self.allows_next(&next) {
+            let previous = {
+                swap(self.current.as_mut(), &mut next);
+                next
+            };
+            if previous.is_resumable() {
+                events.pause(instance);
+                self.memory.push(previous);
+            } else {
+                events.stop(instance, previous);
+            }
+            events.start(instance);
+            self.set_result(Ok(()));
+        } else {
+            warn!(
+                "{instance:?}: transition {:?} -> {next:?} is not allowed",
+                *self.current
+            );
+            self.set_result(Err(TransitionError::RejectedNext(next)));
+        }
+    }
+
+    fn pop(&mut self, instance: Instance<T>, events: &mut BehaviorEventsMut<T>) {
+        if let Some(mut previous) = self.memory.pop() {
+            debug!("{instance:?}: {:?} -> {previous:?}", *self.current);
+            let previous = {
+                swap(self.current.as_mut(), &mut previous);
+                previous
+            };
+            events.resume(instance);
+            events.stop(instance, previous);
+            self.set_result(Ok(()));
+        } else {
+            error!(
+                "{instance:?}: transition {:?} -> None is not allowed",
+                *self.current
+            );
+            self.set_result(Err(TransitionError::NoPrevious));
+        }
+    }
+
+    fn clear(&mut self, instance: Instance<T>, events: &mut BehaviorEventsMut<T>) {
+        while self.memory.len() > 1 {
+            let previous = self.memory.pop().unwrap();
+            events.stop(instance, previous);
+        }
+
+        self.pop(instance, events);
+    }
+}
+
+impl<T: Behavior> Deref for BehaviorMutItem<'_, T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.current
+    }
+}
+
+#[derive(Component, Deref, DerefMut, Reflect)]
+#[reflect(Component)]
+struct Memory<T: Behavior> {
+    stack: Vec<T>,
+}
+
+impl<T: Behavior> Default for Memory<T> {
+    fn default() -> Self {
+        Self { stack: default() }
     }
 }

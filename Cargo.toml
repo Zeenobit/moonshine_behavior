@@ -1,21 +1,19 @@
 [package]
 name = "moonshine-behavior"
-version = "0.1.6"
+version = "0.2.0"
 edition = "2021"
 license = "MIT"
 description = "Minimalistic state machine for Bevy game engine."
 homepage = "https://github.com/Zeenobit/moonshine_behavior"
 repository = "https://github.com/Zeenobit/moonshine_behavior"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 bevy_app = "0.15.*"
 bevy_ecs = "0.15.*"
 bevy_reflect = "0.15.*"
 bevy_utils = "0.15.*"
+bevy_derive = "0.15.*"
 moonshine-kind = { version = "0.2.*", path = "../core/crates/kind" }
-moonshine-util = { version = "0.2.*", path = "../core/crates/util" }
 
 [dev-dependencies]
 bevy = "0.15.*"
