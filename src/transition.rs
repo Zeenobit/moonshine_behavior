@@ -48,10 +48,6 @@ pub fn transition<T: Behavior>(
     mut query: Query<(Instance<T>, BehaviorMut<T>, Option<&mut Sequence<T>>), TransitionChanged<T>>,
 ) {
     for (instance, mut behavior, sequence_opt) in &mut query {
-        if behavior.current.is_added() {
-            events.start(instance);
-        }
-
         match behavior.transition.take() {
             Next(next) => {
                 behavior.push(instance, next, &mut events);
@@ -59,7 +55,11 @@ pub fn transition<T: Behavior>(
             }
             Previous => behavior.pop(instance, &mut events),
             Reset => behavior.clear(instance, &mut events),
-            _ => (),
+            _ => {
+                if behavior.current.is_added() {
+                    events.start(instance);
+                }
+            }
         }
 
         if let Some(next) = sequence_opt.map(|mut sequence| sequence.pop()).flatten() {
