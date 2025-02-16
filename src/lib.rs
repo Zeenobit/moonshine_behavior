@@ -29,7 +29,7 @@ use bevy_derive::{Deref, DerefMut};
 use bevy_ecs::{prelude::*, query::QueryData};
 use bevy_reflect::prelude::*;
 use bevy_utils::prelude::*;
-use bevy_utils::tracing::{debug, error, warn};
+use bevy_utils::tracing::{debug, warn};
 use events::BehaviorEventsMut;
 use moonshine_kind::prelude::*;
 
@@ -172,7 +172,7 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
             events.stop(instance, previous);
             self.set_result(Ok(()));
         } else {
-            error!(
+            warn!(
                 "{instance:?}: transition {:?} -> None is not allowed",
                 *self.current
             );
