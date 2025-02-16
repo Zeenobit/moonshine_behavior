@@ -43,7 +43,8 @@ impl<B> Default for BehaviorPlugin<B> {
 impl<B: RegisterableBehavior> Plugin for BehaviorPlugin<B> {
     fn build(&self, app: &mut App) {
         app.register_type::<Memory<B>>()
-            .register_type::<Controller<B>>();
+            .register_type::<Controller<B>>()
+            .register_required_components::<B, Controller<B>>();
 
         if self.send_events {
             #[allow(deprecated)]
