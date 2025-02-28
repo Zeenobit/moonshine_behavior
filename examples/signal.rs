@@ -102,44 +102,44 @@ fn update_lights(
     mut pause_events: PauseEvents<Signal>,
     mut stop_events: StopEvents<Signal>,
     behavior: Query<BehaviorRef<Signal>>,
-    green: Query<Entity, With<GreenLight>>,
-    yellow: Query<Entity, With<YellowLight>>,
-    red: Query<Entity, With<RedLight>>,
+    green: Single<Entity, With<GreenLight>>,
+    yellow: Single<Entity, With<YellowLight>>,
+    red: Single<Entity, With<RedLight>>,
     mut fill: Query<&mut ShapeFill>,
 ) {
     use Signal::*;
     for Start { instance } in start_events.read() {
         let behavior = behavior.get(instance.entity()).unwrap();
         match behavior.current() {
-            Green => fill.get_mut(green.single()).unwrap().color = GREEN_COLOR,
-            Yellow(_) => fill.get_mut(yellow.single()).unwrap().color = YELLOW_COLOR,
-            Red => fill.get_mut(red.single()).unwrap().color = RED_COLOR,
+            Green => fill.get_mut(*green).unwrap().color = GREEN_COLOR,
+            Yellow(_) => fill.get_mut(*yellow).unwrap().color = YELLOW_COLOR,
+            Red => fill.get_mut(*red).unwrap().color = RED_COLOR,
         };
     }
 
     for Resume { instance } in resume_events.read() {
         let behavior = behavior.get(instance.entity()).unwrap();
         match behavior.current() {
-            Green => fill.get_mut(green.single()).unwrap().color = GREEN_COLOR,
-            Yellow(_) => fill.get_mut(yellow.single()).unwrap().color = YELLOW_COLOR,
-            Red => fill.get_mut(red.single()).unwrap().color = RED_COLOR,
+            Green => fill.get_mut(*green).unwrap().color = GREEN_COLOR,
+            Yellow(_) => fill.get_mut(*yellow).unwrap().color = YELLOW_COLOR,
+            Red => fill.get_mut(*red).unwrap().color = RED_COLOR,
         };
     }
 
     for Pause { instance } in pause_events.read() {
         let behavior = behavior.get(instance.entity()).unwrap();
         match behavior.previous().unwrap() {
-            Green => fill.get_mut(green.single()).unwrap().color = GREEN_COLOR.darker(0.6),
-            Yellow(_) => fill.get_mut(yellow.single()).unwrap().color = YELLOW_COLOR.darker(0.6),
-            Red => fill.get_mut(red.single()).unwrap().color = RED_COLOR.darker(0.6),
+            Green => fill.get_mut(*green).unwrap().color = GREEN_COLOR.darker(0.6),
+            Yellow(_) => fill.get_mut(*yellow).unwrap().color = YELLOW_COLOR.darker(0.6),
+            Red => fill.get_mut(*red).unwrap().color = RED_COLOR.darker(0.6),
         }
     }
 
     for Stop { behavior, .. } in stop_events.read() {
         match behavior {
-            Green => fill.get_mut(green.single()).unwrap().color = OFF_COLOR,
-            Yellow(_) => fill.get_mut(yellow.single()).unwrap().color = OFF_COLOR,
-            Red => fill.get_mut(red.single()).unwrap().color = OFF_COLOR,
+            Green => fill.get_mut(*green).unwrap().color = OFF_COLOR,
+            Yellow(_) => fill.get_mut(*yellow).unwrap().color = OFF_COLOR,
+            Red => fill.get_mut(*red).unwrap().color = OFF_COLOR,
         }
     }
 }
