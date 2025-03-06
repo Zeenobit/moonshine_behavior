@@ -5,6 +5,34 @@ use moonshine_kind::prelude::*;
 use crate::Behavior;
 
 #[derive(SystemParam)]
+pub struct BehaviorEvents<'w, 's, T: Behavior> {
+    start: EventReader<'w, 's, Start<T>>,
+    pause: EventReader<'w, 's, Pause<T>>,
+    resume: EventReader<'w, 's, Resume<T>>,
+    stop: EventReader<'w, 's, Stop<T>>,
+}
+
+impl<T: Behavior> BehaviorEvents<'_, '_, T> {
+    pub fn start(&mut self) -> impl Iterator<Item = Instance<T>> + '_ {
+        self.start.read().map(|&Start { instance }| instance)
+    }
+
+    pub fn resume(&mut self) -> impl Iterator<Item = Instance<T>> + '_ {
+        self.resume.read().map(|&Resume { instance }| instance)
+    }
+
+    pub fn pause(&mut self) -> impl Iterator<Item = Instance<T>> + '_ {
+        self.pause.read().map(|&Pause { instance }| instance)
+    }
+
+    pub fn stop(&mut self) -> impl Iterator<Item = (Instance<T>, &T)> + '_ {
+        self.stop
+            .read()
+            .map(|Stop { instance, behavior }| (*instance, behavior))
+    }
+}
+
+#[derive(SystemParam)]
 pub struct BehaviorEventsMut<'w, T: Behavior> {
     start: EventWriter<'w, Start<T>>,
     pause: EventWriter<'w, Pause<T>>,

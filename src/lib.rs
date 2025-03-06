@@ -3,12 +3,8 @@ pub mod prelude {
 
     pub use crate::transition::{transition, Next, Previous, Reset, Transition};
 
+    pub use crate::events::BehaviorEvents;
     pub use crate::plugin::BehaviorPlugin;
-
-    pub use crate::events::{Pause, PauseEvents};
-    pub use crate::events::{Resume, ResumeEvents};
-    pub use crate::events::{Start, StartEvents};
-    pub use crate::events::{Stop, StopEvents};
 
     pub use crate::sequence::Sequence;
 }
