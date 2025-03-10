@@ -69,6 +69,12 @@ impl<T: Behavior> Deref for BehaviorRefItem<'_, T> {
     }
 }
 
+impl<T: Behavior> AsRef<T> for BehaviorRefItem<'_, T> {
+    fn as_ref(&self) -> &T {
+        self.current
+    }
+}
+
 #[derive(QueryData)]
 #[query_data(mutable)]
 pub struct BehaviorMut<T: Behavior> {
@@ -93,6 +99,12 @@ impl<T: Behavior> Deref for BehaviorMutReadOnlyItem<'_, T> {
 
     fn deref(&self) -> &Self::Target {
         self.current()
+    }
+}
+
+impl<T: Behavior> AsRef<T> for BehaviorMutReadOnlyItem<'_, T> {
+    fn as_ref(&self) -> &T {
+        self.current.as_ref()
     }
 }
 
@@ -197,6 +209,18 @@ impl<T: Behavior> Deref for BehaviorMutItem<'_, T> {
 impl<T: Behavior> DerefMut for BehaviorMutItem<'_, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.current_mut()
+    }
+}
+
+impl<T: Behavior> AsRef<T> for BehaviorMutItem<'_, T> {
+    fn as_ref(&self) -> &T {
+        self.current.as_ref()
+    }
+}
+
+impl<T: Behavior> AsMut<T> for BehaviorMutItem<'_, T> {
+    fn as_mut(&mut self) -> &mut T {
+        self.current.as_mut()
     }
 }
 
