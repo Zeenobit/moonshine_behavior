@@ -152,6 +152,7 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
                 swap(self.current.as_mut(), &mut next);
                 next
             };
+            debug!("{instance:?}: {previous:?} -> {:?}", *self.current);
             if previous.is_resumable() {
                 events.pause(instance);
                 self.memory.push(previous);
