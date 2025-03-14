@@ -136,7 +136,10 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
     fn set_transition(&mut self, transition: Transition<T>) {
         let previous = replace(self.transition.as_mut(), transition);
         if !previous.is_none() {
-            warn!("transition override: {previous:?} -> {:?}", self.transition);
+            warn!(
+                "transition override: {previous:?} -> {:?}",
+                *self.transition
+            );
         }
     }
 
