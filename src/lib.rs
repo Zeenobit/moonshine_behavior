@@ -49,6 +49,7 @@ pub trait Behavior: Component + Debug {
 pub struct BehaviorRef<T: Behavior> {
     current: &'static T,
     memory: &'static Memory<T>,
+    transition: &'static Transition<T>,
 }
 
 impl<T: Behavior> BehaviorRefItem<'_, T> {
@@ -58,6 +59,10 @@ impl<T: Behavior> BehaviorRefItem<'_, T> {
 
     pub fn previous(&self) -> Option<&T> {
         self.memory.last()
+    }
+
+    pub fn has_transition(&self) -> bool {
+        !self.transition.is_none()
     }
 }
 
@@ -92,6 +97,10 @@ impl<T: Behavior> BehaviorMutReadOnlyItem<'_, T> {
     pub fn previous(&self) -> Option<&T> {
         self.memory.last()
     }
+
+    pub fn has_transition(&self) -> bool {
+        !self.transition.is_none()
+    }
 }
 
 impl<T: Behavior> Deref for BehaviorMutReadOnlyItem<'_, T> {
@@ -119,6 +128,10 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
 
     pub fn previous(&self) -> Option<&T> {
         self.memory.last()
+    }
+
+    pub fn has_transition(&self) -> bool {
+        !self.transition.is_none()
     }
 
     pub fn start(&mut self, behavior: T) {
