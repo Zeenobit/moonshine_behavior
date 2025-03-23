@@ -14,7 +14,7 @@ enum T {
 }
 
 impl Behavior for T {
-    fn allows_next(&self, next: &Self) -> bool {
+    fn filter_next(&self, next: &Self) -> bool {
         match (self, next) {
             (A, B) | (B, C) | (A, D) => true,
             _ => false,

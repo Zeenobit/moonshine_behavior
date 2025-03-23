@@ -32,7 +32,7 @@ use moonshine_kind::prelude::*;
 use self::transition::*;
 
 pub trait Behavior: Component + Debug {
-    fn allows_next(&self, next: &Self) -> bool {
+    fn filter_next(&self, next: &Self) -> bool {
         match (self, next) {
             _ => true,
         }
@@ -163,7 +163,7 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
     }
 
     fn push(&mut self, instance: Instance<T>, mut next: T, events: &mut BehaviorEventsMut<T>) {
-        if self.allows_next(&next) {
+        if self.filter_next(&next) {
             let previous = {
                 swap(self.current.as_mut(), &mut next);
                 next

@@ -28,7 +28,7 @@ enum Signal {
 }
 
 impl Behavior for Signal {
-    fn allows_next(&self, next: &Self) -> bool {
+    fn filter_next(&self, next: &Self) -> bool {
         use Signal::*;
         match (self, next) {
             (Green, Yellow(..)) | (Yellow(..), Red) => true,
