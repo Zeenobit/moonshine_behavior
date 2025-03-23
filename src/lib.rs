@@ -7,6 +7,8 @@ pub mod prelude {
     pub use crate::plugin::BehaviorPlugin;
 
     pub use crate::sequence::Sequence;
+
+    pub use crate::match_next_behavior;
 }
 
 pub mod events;
@@ -33,8 +35,9 @@ use self::transition::*;
 
 pub trait Behavior: Component + Debug {
     fn filter_next(&self, next: &Self) -> bool {
-        match (self, next) {
-            _ => true,
+        match_next_behavior! {
+            self => next,
+            _ => _,
         }
     }
 
@@ -251,4 +254,57 @@ impl<T: Behavior> Default for Memory<T> {
     fn default() -> Self {
         Self { stack: default() }
     }
+}
+
+/// A convenient macro for implementation of [`Behavior::filter_next`].
+///
+/// # Usage
+/// For any given pair of states `curr` and `next`, this match expands into a match arm such that:
+/// ```rust,ignore
+/// match curr {
+///     From => matches!(next, To)
+/// }
+/// ```
+/// where `From` is the current possible state, and `To` is the next allowed state.
+///
+/// # Example
+///
+/// ```rust
+/// # use bevy::prelude::*;
+/// # use moonshine_behavior::prelude::*;
+/// #[derive(Component, Debug)]
+/// enum Soldier {
+///     Idle,
+///     Crouch,
+///     Fire,
+///     Sprint,
+///     Jump,
+/// }
+///
+/// impl Behavior for Soldier {
+///     fn filter_next(&self, next: &Self) -> bool {
+///         use Soldier::*;
+///         match_next_behavior! {
+///             self => next,
+///             Idle => Crouch | Sprint | Fire | Jump,
+///             Crouch => Sprint | Fire,
+///             Sprint => Jump,
+///         }
+///     }
+/// }
+///
+/// # assert!(Soldier::Idle.filter_next(&Soldier::Crouch));
+/// # assert!(!Soldier::Sprint.filter_next(&Soldier::Fire));
+/// ```
+#[macro_export]
+macro_rules! match_next_behavior {
+    { $curr:ident => $next:ident, $($from:pat => $to:pat),* $(,)? } => {
+        match $curr {
+            $(
+                $from => matches!($next, $to),
+            )*
+            #[allow(unreachable_patterns)]
+            _ => false,
+        }
+    };
 }
