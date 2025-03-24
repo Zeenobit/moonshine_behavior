@@ -24,6 +24,7 @@ use std::mem::{replace, swap};
 use std::ops::{Deref, DerefMut};
 
 use bevy_derive::{Deref, DerefMut};
+use bevy_ecs::component::Tick;
 use bevy_ecs::{prelude::*, query::QueryData};
 use bevy_reflect::prelude::*;
 use bevy_utils::prelude::*;
@@ -50,7 +51,7 @@ pub trait Behavior: Component + Debug {
 
 #[derive(QueryData)]
 pub struct BehaviorRef<T: Behavior> {
-    current: &'static T,
+    current: Ref<'static, T>,
     memory: &'static Memory<T>,
     transition: &'static Transition<T>,
 }
@@ -79,7 +80,21 @@ impl<T: Behavior> Deref for BehaviorRefItem<'_, T> {
 
 impl<T: Behavior> AsRef<T> for BehaviorRefItem<'_, T> {
     fn as_ref(&self) -> &T {
-        self.current
+        &self.current
+    }
+}
+
+impl<T: Behavior> DetectChanges for BehaviorRefItem<'_, T> {
+    fn is_added(&self) -> bool {
+        self.current.is_added()
+    }
+
+    fn is_changed(&self) -> bool {
+        self.current.is_changed()
+    }
+
+    fn last_changed(&self) -> Tick {
+        self.current.last_changed()
     }
 }
 
@@ -117,6 +132,20 @@ impl<T: Behavior> Deref for BehaviorMutReadOnlyItem<'_, T> {
 impl<T: Behavior> AsRef<T> for BehaviorMutReadOnlyItem<'_, T> {
     fn as_ref(&self) -> &T {
         self.current.as_ref()
+    }
+}
+
+impl<T: Behavior> DetectChanges for BehaviorMutReadOnlyItem<'_, T> {
+    fn is_added(&self) -> bool {
+        self.current.is_added()
+    }
+
+    fn is_changed(&self) -> bool {
+        self.current.is_changed()
+    }
+
+    fn last_changed(&self) -> Tick {
+        self.current.last_changed()
     }
 }
 
@@ -229,6 +258,36 @@ impl<T: Behavior> Deref for BehaviorMutItem<'_, T> {
 impl<T: Behavior> DerefMut for BehaviorMutItem<'_, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.current_mut()
+    }
+}
+
+impl<T: Behavior> DetectChanges for BehaviorMutItem<'_, T> {
+    fn is_added(&self) -> bool {
+        self.current.is_added()
+    }
+
+    fn is_changed(&self) -> bool {
+        self.current.is_changed()
+    }
+
+    fn last_changed(&self) -> Tick {
+        self.current.last_changed()
+    }
+}
+
+impl<T: Behavior> DetectChangesMut for BehaviorMutItem<'_, T> {
+    type Inner = T;
+
+    fn set_changed(&mut self) {
+        self.current.set_changed()
+    }
+
+    fn set_last_changed(&mut self, last_changed: Tick) {
+        self.current.set_last_changed(last_changed)
+    }
+
+    fn bypass_change_detection(&mut self) -> &mut Self::Inner {
+        self.current.bypass_change_detection()
     }
 }
 
