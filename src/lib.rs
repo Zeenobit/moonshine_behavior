@@ -34,7 +34,7 @@ use moonshine_kind::prelude::*;
 
 use self::transition::*;
 
-pub trait Behavior: Component + Debug {
+pub trait Behavior: 'static + Debug + Send + Sync {
     fn filter_next(&self, next: &Self) -> bool {
         match_next_behavior! {
             self => next,
@@ -50,13 +50,13 @@ pub trait Behavior: Component + Debug {
 }
 
 #[derive(QueryData)]
-pub struct BehaviorRef<T: Behavior> {
+pub struct BehaviorRef<T: Behavior + Component> {
     current: Ref<'static, T>,
     memory: &'static Memory<T>,
     transition: &'static Transition<T>,
 }
 
-impl<T: Behavior> BehaviorRefItem<'_, T> {
+impl<T: Behavior + Component> BehaviorRefItem<'_, T> {
     pub fn current(&self) -> &T {
         &self.current
     }
@@ -70,7 +70,7 @@ impl<T: Behavior> BehaviorRefItem<'_, T> {
     }
 }
 
-impl<T: Behavior> Deref for BehaviorRefItem<'_, T> {
+impl<T: Behavior + Component> Deref for BehaviorRefItem<'_, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -78,13 +78,13 @@ impl<T: Behavior> Deref for BehaviorRefItem<'_, T> {
     }
 }
 
-impl<T: Behavior> AsRef<T> for BehaviorRefItem<'_, T> {
+impl<T: Behavior + Component> AsRef<T> for BehaviorRefItem<'_, T> {
     fn as_ref(&self) -> &T {
         &self.current
     }
 }
 
-impl<T: Behavior> DetectChanges for BehaviorRefItem<'_, T> {
+impl<T: Behavior + Component> DetectChanges for BehaviorRefItem<'_, T> {
     fn is_added(&self) -> bool {
         self.current.is_added()
     }
@@ -100,14 +100,14 @@ impl<T: Behavior> DetectChanges for BehaviorRefItem<'_, T> {
 
 #[derive(QueryData)]
 #[query_data(mutable)]
-pub struct BehaviorMut<T: Behavior> {
+pub struct BehaviorMut<T: Behavior + Component> {
     current: Mut<'static, T>,
     memory: &'static mut Memory<T>,
     transition: &'static mut Transition<T>,
     response: Option<&'static mut TransitionResponse<T>>,
 }
 
-impl<T: Behavior> BehaviorMutReadOnlyItem<'_, T> {
+impl<T: Behavior + Component> BehaviorMutReadOnlyItem<'_, T> {
     pub fn current(&self) -> &T {
         &self.current
     }
@@ -121,7 +121,7 @@ impl<T: Behavior> BehaviorMutReadOnlyItem<'_, T> {
     }
 }
 
-impl<T: Behavior> Deref for BehaviorMutReadOnlyItem<'_, T> {
+impl<T: Behavior + Component> Deref for BehaviorMutReadOnlyItem<'_, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -129,13 +129,13 @@ impl<T: Behavior> Deref for BehaviorMutReadOnlyItem<'_, T> {
     }
 }
 
-impl<T: Behavior> AsRef<T> for BehaviorMutReadOnlyItem<'_, T> {
+impl<T: Behavior + Component> AsRef<T> for BehaviorMutReadOnlyItem<'_, T> {
     fn as_ref(&self) -> &T {
         self.current.as_ref()
     }
 }
 
-impl<T: Behavior> DetectChanges for BehaviorMutReadOnlyItem<'_, T> {
+impl<T: Behavior + Component> DetectChanges for BehaviorMutReadOnlyItem<'_, T> {
     fn is_added(&self) -> bool {
         self.current.is_added()
     }
@@ -149,7 +149,7 @@ impl<T: Behavior> DetectChanges for BehaviorMutReadOnlyItem<'_, T> {
     }
 }
 
-impl<T: Behavior> BehaviorMutItem<'_, T> {
+impl<T: Behavior + Component> BehaviorMutItem<'_, T> {
     pub fn current(&self) -> &T {
         &self.current
     }
@@ -165,7 +165,9 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
     pub fn has_transition(&self) -> bool {
         !self.transition.is_none()
     }
+}
 
+impl<T: Behavior + Component> BehaviorMutItem<'_, T> {
     pub fn start(&mut self, behavior: T) {
         self.set_transition(Next(behavior));
     }
@@ -247,7 +249,7 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
     }
 }
 
-impl<T: Behavior> Deref for BehaviorMutItem<'_, T> {
+impl<T: Behavior + Component> Deref for BehaviorMutItem<'_, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -255,13 +257,13 @@ impl<T: Behavior> Deref for BehaviorMutItem<'_, T> {
     }
 }
 
-impl<T: Behavior> DerefMut for BehaviorMutItem<'_, T> {
+impl<T: Behavior + Component> DerefMut for BehaviorMutItem<'_, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.current_mut()
     }
 }
 
-impl<T: Behavior> DetectChanges for BehaviorMutItem<'_, T> {
+impl<T: Behavior + Component> DetectChanges for BehaviorMutItem<'_, T> {
     fn is_added(&self) -> bool {
         self.current.is_added()
     }
@@ -275,7 +277,7 @@ impl<T: Behavior> DetectChanges for BehaviorMutItem<'_, T> {
     }
 }
 
-impl<T: Behavior> DetectChangesMut for BehaviorMutItem<'_, T> {
+impl<T: Behavior + Component> DetectChangesMut for BehaviorMutItem<'_, T> {
     type Inner = T;
 
     fn set_changed(&mut self) {
@@ -291,13 +293,13 @@ impl<T: Behavior> DetectChangesMut for BehaviorMutItem<'_, T> {
     }
 }
 
-impl<T: Behavior> AsRef<T> for BehaviorMutItem<'_, T> {
+impl<T: Behavior + Component> AsRef<T> for BehaviorMutItem<'_, T> {
     fn as_ref(&self) -> &T {
         self.current.as_ref()
     }
 }
 
-impl<T: Behavior> AsMut<T> for BehaviorMutItem<'_, T> {
+impl<T: Behavior + Component> AsMut<T> for BehaviorMutItem<'_, T> {
     fn as_mut(&mut self) -> &mut T {
         self.current.as_mut()
     }

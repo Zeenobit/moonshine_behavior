@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use bevy_ecs::prelude::*;
 use bevy_reflect::prelude::*;
 use moonshine_kind::Instance;
@@ -43,7 +45,7 @@ impl<T: Behavior + Clone> Clone for Transition<T> {
     }
 }
 
-pub fn transition<T: Behavior>(
+pub fn transition<T: Behavior + Component>(
     mut events: BehaviorEventsMut<T>,
     mut query: Query<(Instance<T>, BehaviorMut<T>, Option<&mut Sequence<T>>), TransitionChanged<T>>,
 ) {

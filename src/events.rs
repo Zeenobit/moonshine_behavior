@@ -5,14 +5,14 @@ use moonshine_kind::prelude::*;
 use crate::Behavior;
 
 #[derive(SystemParam)]
-pub struct BehaviorEvents<'w, 's, T: Behavior> {
+pub struct BehaviorEvents<'w, 's, T: Behavior + Component> {
     start: EventReader<'w, 's, Start<T>>,
     pause: EventReader<'w, 's, Pause<T>>,
     resume: EventReader<'w, 's, Resume<T>>,
     stop: EventReader<'w, 's, Stop<T>>,
 }
 
-impl<T: Behavior> BehaviorEvents<'_, '_, T> {
+impl<T: Behavior + Component> BehaviorEvents<'_, '_, T> {
     pub fn start(&mut self) -> impl Iterator<Item = Instance<T>> + '_ {
         self.start.read().map(|&Start { instance }| instance)
     }
@@ -33,14 +33,14 @@ impl<T: Behavior> BehaviorEvents<'_, '_, T> {
 }
 
 #[derive(SystemParam)]
-pub struct BehaviorEventsMut<'w, T: Behavior> {
+pub struct BehaviorEventsMut<'w, T: Behavior + Component> {
     start: EventWriter<'w, Start<T>>,
     pause: EventWriter<'w, Pause<T>>,
     resume: EventWriter<'w, Resume<T>>,
     stop: EventWriter<'w, Stop<T>>,
 }
 
-impl<T: Behavior> BehaviorEventsMut<'_, T> {
+impl<T: Behavior + Component> BehaviorEventsMut<'_, T> {
     pub(crate) fn start(&mut self, instance: Instance<T>) {
         self.start.send(Start { instance });
     }
@@ -58,28 +58,23 @@ impl<T: Behavior> BehaviorEventsMut<'_, T> {
     }
 }
 
-pub type StartEvents<'w, 's, T> = EventReader<'w, 's, Start<T>>;
-pub type PauseEvents<'w, 's, T> = EventReader<'w, 's, Pause<T>>;
-pub type ResumeEvents<'w, 's, T> = EventReader<'w, 's, Resume<T>>;
-pub type StopEvents<'w, 's, T> = EventReader<'w, 's, Stop<T>>;
-
 #[derive(Event)]
-pub struct Start<T: Behavior> {
+pub(crate) struct Start<T: Behavior + Component> {
     pub instance: Instance<T>,
 }
 
 #[derive(Event)]
-pub struct Pause<T: Behavior> {
+pub(crate) struct Pause<T: Behavior + Component> {
     pub instance: Instance<T>,
 }
 
 #[derive(Event)]
-pub struct Resume<T: Behavior> {
+pub(crate) struct Resume<T: Behavior + Component> {
     pub instance: Instance<T>,
 }
 
 #[derive(Event)]
-pub struct Stop<T: Behavior> {
+pub(crate) struct Stop<T: Behavior + Component> {
     pub instance: Instance<T>,
     pub behavior: T,
 }
