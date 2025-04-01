@@ -8,7 +8,7 @@ pub mod prelude {
 
     pub use crate::sequence::Sequence;
 
-    pub use crate::match_next_behavior;
+    pub use crate::match_next;
 }
 
 pub mod events;
@@ -36,7 +36,7 @@ use self::transition::*;
 
 pub trait Behavior: 'static + Debug + Send + Sync {
     fn filter_next(&self, next: &Self) -> bool {
-        match_next_behavior! {
+        match_next! {
             self => next,
             _ => _,
         }
@@ -345,7 +345,7 @@ impl<T: Behavior> Default for Memory<T> {
 /// impl Behavior for Soldier {
 ///     fn filter_next(&self, next: &Self) -> bool {
 ///         use Soldier::*;
-///         match_next_behavior! {
+///         match_next! {
 ///             self => next,
 ///             Idle => Crouch | Sprint | Fire | Jump,
 ///             Crouch => Sprint | Fire,
@@ -358,7 +358,7 @@ impl<T: Behavior> Default for Memory<T> {
 /// # assert!(!Soldier::Sprint.filter_next(&Soldier::Fire));
 /// ```
 #[macro_export]
-macro_rules! match_next_behavior {
+macro_rules! match_next {
     { $curr:ident => $next:ident, $($from:pat => $to:pat),* $(,)? } => {
         match $curr {
             $(
