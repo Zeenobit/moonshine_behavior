@@ -35,6 +35,10 @@ use moonshine_kind::prelude::*;
 use self::transition::*;
 
 pub trait Behavior: 'static + Debug + Send + Sync {
+    /// Called when an interrupt is requested.
+    ///
+    /// If this returns `true`, the current behavior will stop to allow the next behavior to start.
+    /// Note that the initial behavior is never allowed to yield.
     fn filter_yield(&self, next: &Self) -> bool {
         match_next! {
             self => next,
@@ -42,6 +46,10 @@ pub trait Behavior: 'static + Debug + Send + Sync {
         }
     }
 
+    /// Called before a new behavior is started.
+    ///
+    /// If this returns `false`, the transition fails.
+    /// See [`BehaviorEvents::error`](crate::events::BehaviorEvents) for details on how to handle transition failures.
     fn filter_next(&self, next: &Self) -> bool {
         match_next! {
             self => next,
@@ -49,6 +57,10 @@ pub trait Behavior: 'static + Debug + Send + Sync {
         }
     }
 
+    /// Called after a behavior is paused.
+    ///
+    /// If this returns `false`, the paused behavior will be stopped immediatedly and discarded.
+    /// Note that no [`pause`](crate::events::BehaviorEvents::pause) event will be sent in this case.
     fn is_resumable(&self) -> bool {
         match self {
             _ => true,
