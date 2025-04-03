@@ -193,7 +193,7 @@ impl<T: Behavior + Component> BehaviorMutItem<'_, T> {
     ///
     /// Note that this will fail if the first non-yielding behavior rejects `next` through [`Behavior::filter_next`].
     /// See [`BehaviorEvents::error`](crate::events::BehaviorEvents) for details on how to handle transition failures.
-    pub fn start_interrupt(&mut self, next: T) {
+    pub fn interrupt_start(&mut self, next: T) {
         self.set_transition(Interrupt(next));
     }
 

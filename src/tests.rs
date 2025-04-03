@@ -162,7 +162,7 @@ fn interrupt() {
 
     app.world_mut()
         .run_system_once(|mut q: Query<BehaviorMut<T>>| {
-            q.single_mut().start_interrupt(D);
+            q.single_mut().interrupt_start(D);
         })
         .unwrap();
     app.update();
@@ -188,7 +188,7 @@ fn interrupt_push() {
 
     app.world_mut()
         .run_system_once(|mut q: Single<BehaviorMut<T>>| {
-            q.start_interrupt(C);
+            q.interrupt_start(C);
         })
         .unwrap();
     app.update();
@@ -214,7 +214,7 @@ fn interrupt_error() {
 
     app.world_mut()
         .run_system_once(|mut q: Single<BehaviorMut<T>>| {
-            q.start_interrupt(A);
+            q.interrupt_start(A);
         })
         .unwrap();
     app.update();
