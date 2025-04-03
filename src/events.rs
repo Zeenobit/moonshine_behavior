@@ -32,7 +32,7 @@ pub struct BehaviorEvents<'w, 's, T: Behavior + Component> {
     pause: EventReader<'w, 's, Pause<T>>,
     resume: EventReader<'w, 's, Resume<T>>,
     stop: EventReader<'w, 's, Stop<T>>,
-    reject: EventReader<'w, 's, Error<T>>,
+    error: EventReader<'w, 's, Error<T>>,
 }
 
 impl<T: Behavior + Component> BehaviorEvents<'_, '_, T> {
@@ -55,7 +55,7 @@ impl<T: Behavior + Component> BehaviorEvents<'_, '_, T> {
     }
 
     pub fn error(&mut self) -> impl Iterator<Item = (Instance<T>, &TransitionError<T>)> + '_ {
-        self.reject
+        self.error
             .read()
             .map(|Error { instance, error }| (*instance, error))
     }
@@ -67,7 +67,7 @@ pub struct BehaviorEventsMut<'w, T: Behavior + Component> {
     pause: EventWriter<'w, Pause<T>>,
     resume: EventWriter<'w, Resume<T>>,
     stop: EventWriter<'w, Stop<T>>,
-    reject: EventWriter<'w, Error<T>>,
+    error: EventWriter<'w, Error<T>>,
 }
 
 impl<T: Behavior + Component> BehaviorEventsMut<'_, T> {
@@ -88,7 +88,7 @@ impl<T: Behavior + Component> BehaviorEventsMut<'_, T> {
     }
 
     pub(crate) fn error(&mut self, instance: Instance<T>, error: TransitionError<T>) {
-        self.reject.send(Error { instance, error });
+        self.error.send(Error { instance, error });
     }
 }
 
