@@ -178,20 +178,39 @@ impl<T: Behavior + Component> BehaviorMutItem<'_, T> {
     ///
     /// This operation pushes the current behavior onto the stack and inserts the new behavior.
     ///
-    /// Note that this might fail if the next behavior is rejected by [`Behavior::filter_next`].
-    /// See
+    /// Note that this will fail if the current behavior rejects `next` through [`Behavior::filter_next`].
+    /// See [`BehaviorEvents::error`](crate::events::BehaviorEvents) for details on how to handle transition failures.
     pub fn start(&mut self, next: T) {
         self.set_transition(Next(next));
     }
 
+    /// Interrupts the current behavior and starts the given `next` behavior.
+    ///
+    /// This operation stops all behaviors which yield to the new behavior and pushes it onto the stack.
+    /// See [`Behavior::filter_yield`] for details on how to define how states yield to each other.
+    ///
+    /// The initial behavior is never allowed to yield.
+    ///
+    /// Note that this will fail if the first non-yielding behavior rejects `next` through [`Behavior::filter_next`].
+    /// See [`BehaviorEvents::error`](crate::events::BehaviorEvents) for details on how to handle transition failures.
     pub fn start_interrupt(&mut self, next: T) {
         self.set_transition(Interrupt(next));
     }
 
+    /// Stops the current behavior.
+    ///
+    /// This operation pops the current behavior off the stack and resumes the previous behavior.
+    ///
+    /// Note that this will fail if the current behavior is the initial behavior.
+    /// See [`BehaviorEvents::error`](crate::events::BehaviorEvents) for details on how to handle transition failures.
     pub fn stop(&mut self) {
         self.set_transition(Previous);
     }
 
+    /// Stops the current and all previous behaviors and resumes the initial behavior.
+    ///
+    /// This operation clears the stack and resumes the initial behavior. It can never fail.
+    /// If the stack is empty (i.e. initial behavior), it does nothing.
     pub fn reset(&mut self) {
         self.set_transition(Reset);
     }
