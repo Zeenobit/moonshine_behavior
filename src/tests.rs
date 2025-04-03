@@ -15,9 +15,18 @@ enum T {
 
 impl Behavior for T {
     fn filter_next(&self, next: &Self) -> bool {
-        match (self, next) {
-            (A, B) | (B, C) | (A, D) => true,
-            _ => false,
+        match_next! {
+            self => next,
+            A => B | D,
+            B => C,
+            C => D,
+        }
+    }
+
+    fn filter_yield(&self, next: &Self) -> bool {
+        match self {
+            A => false,
+            _ => true,
         }
     }
 }
@@ -142,6 +151,38 @@ fn sequence() {
     );
 
     // Sequence should be done, check again to be sure:
+    app.update();
+    assert_eq!(
+        app.world_mut()
+            .run_system_once(|q: Query<BehaviorRef<T>>| {
+                let behavior = q.single();
+                (behavior.previous().copied(), *behavior.current())
+            })
+            .unwrap(),
+        (Some(A), D)
+    );
+}
+
+#[test]
+fn interrupt() {
+    let mut app = app();
+    app.world_mut().spawn((A, Next(B)));
+    app.update();
+    assert_eq!(
+        app.world_mut()
+            .run_system_once(|q: Query<BehaviorRef<T>>| {
+                let behavior = q.single();
+                (behavior.previous().copied(), *behavior.current())
+            })
+            .unwrap(),
+        (Some(A), B)
+    );
+
+    app.world_mut()
+        .run_system_once(|mut q: Query<BehaviorMut<T>>| {
+            q.single_mut().start_interrupt(D);
+        })
+        .unwrap();
     app.update();
     assert_eq!(
         app.world_mut()

@@ -6,7 +6,7 @@ use moonshine_kind::Instance;
 
 use crate::{sequence::Sequence, Behavior, BehaviorEventsMut, BehaviorMut, Memory};
 
-pub use self::Transition::{Next, Previous, Reset};
+pub use self::Transition::{Interrupt, Next, Previous, Reset};
 
 #[derive(Component, Debug, Reflect)]
 #[require(Memory<T>)]
@@ -14,6 +14,7 @@ pub use self::Transition::{Next, Previous, Reset};
 pub enum Transition<T: Behavior> {
     None,
     Next(T),
+    Interrupt(T),
     Previous,
     Reset,
 }
@@ -39,6 +40,7 @@ impl<T: Behavior + Clone> Clone for Transition<T> {
         match self {
             Self::None => Self::None,
             Next(next) => Next(next.clone()),
+            Interrupt(next) => Interrupt(next.clone()),
             Previous => Previous,
             Reset => Reset,
         }
@@ -53,6 +55,10 @@ pub fn transition<T: Behavior + Component>(
         match behavior.transition.take() {
             Next(next) => {
                 behavior.push(instance, next, &mut events);
+                continue;
+            }
+            Interrupt(next) => {
+                behavior.interrupt(instance, next, &mut events);
                 continue;
             }
             Previous => behavior.pop(instance, &mut events),

@@ -35,6 +35,13 @@ use moonshine_kind::prelude::*;
 use self::transition::*;
 
 pub trait Behavior: 'static + Debug + Send + Sync {
+    fn filter_yield(&self, next: &Self) -> bool {
+        match_next! {
+            self => next,
+            _ => _,
+        }
+    }
+
     fn filter_next(&self, next: &Self) -> bool {
         match_next! {
             self => next,
@@ -172,6 +179,10 @@ impl<T: Behavior + Component> BehaviorMutItem<'_, T> {
         self.set_transition(Next(behavior));
     }
 
+    pub fn start_interrupt(&mut self, behavior: T) {
+        self.set_transition(Interrupt(behavior));
+    }
+
     pub fn stop(&mut self) {
         self.set_transition(Previous);
     }
@@ -218,6 +229,21 @@ impl<T: Behavior + Component> BehaviorMutItem<'_, T> {
             );
             self.set_result(Err(TransitionError::RejectedNext(next)));
         }
+    }
+
+    fn interrupt(&mut self, instance: Instance<T>, next: T, events: &mut BehaviorEventsMut<T>) {
+        while self.filter_yield(&next) && !self.memory.is_empty() {
+            if let Some(mut previous) = self.memory.pop() {
+                debug!("{instance:?}: {:?} -> {previous:?}", *self.current);
+                let previous = {
+                    swap(self.current.as_mut(), &mut previous);
+                    previous
+                };
+                events.stop(instance, previous);
+            }
+        }
+
+        self.push(instance, next, events);
     }
 
     fn pop(&mut self, instance: Instance<T>, events: &mut BehaviorEventsMut<T>) {
