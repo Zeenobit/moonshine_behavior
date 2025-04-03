@@ -111,7 +111,6 @@ pub struct BehaviorMut<T: Behavior + Component> {
     current: Mut<'static, T>,
     memory: &'static mut Memory<T>,
     transition: &'static mut Transition<T>,
-    response: Option<&'static mut TransitionResponse<T>>,
 }
 
 impl<T: Behavior + Component> BehaviorMutReadOnlyItem<'_, T> {
@@ -175,12 +174,18 @@ impl<T: Behavior + Component> BehaviorMutItem<'_, T> {
 }
 
 impl<T: Behavior + Component> BehaviorMutItem<'_, T> {
-    pub fn start(&mut self, behavior: T) {
-        self.set_transition(Next(behavior));
+    /// Starts the given `next` behavior.
+    ///
+    /// This operation pushes the current behavior onto the stack and inserts the new behavior.
+    ///
+    /// Note that this might fail if the next behavior is rejected by [`Behavior::filter_next`].
+    /// See
+    pub fn start(&mut self, next: T) {
+        self.set_transition(Next(next));
     }
 
-    pub fn start_interrupt(&mut self, behavior: T) {
-        self.set_transition(Interrupt(behavior));
+    pub fn start_interrupt(&mut self, next: T) {
+        self.set_transition(Interrupt(next));
     }
 
     pub fn stop(&mut self) {
@@ -201,12 +206,6 @@ impl<T: Behavior + Component> BehaviorMutItem<'_, T> {
         }
     }
 
-    fn set_result(&mut self, result: TransitionResult<T>) {
-        if let Some(response) = self.response.as_mut() {
-            response.set(result);
-        }
-    }
-
     fn push(&mut self, instance: Instance<T>, mut next: T, events: &mut BehaviorEventsMut<T>) {
         if self.filter_next(&next) {
             let previous = {
@@ -221,13 +220,13 @@ impl<T: Behavior + Component> BehaviorMutItem<'_, T> {
                 events.stop(instance, previous);
             }
             events.start(instance);
-            self.set_result(Ok(()));
+            //self.set_result(Ok(()));
         } else {
             warn!(
                 "{instance:?}: transition {:?} -> {next:?} is not allowed",
                 *self.current
             );
-            self.set_result(Err(TransitionError::RejectedNext(next)));
+            events.error(instance, TransitionError::RejectedNext(next));
         }
     }
 
@@ -255,13 +254,12 @@ impl<T: Behavior + Component> BehaviorMutItem<'_, T> {
             };
             events.resume(instance);
             events.stop(instance, previous);
-            self.set_result(Ok(()));
         } else {
             warn!(
                 "{instance:?}: transition {:?} -> None is not allowed",
                 *self.current
             );
-            self.set_result(Err(TransitionError::NoPrevious));
+            events.error(instance, TransitionError::NoPrevious);
         }
     }
 

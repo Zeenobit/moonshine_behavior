@@ -1,8 +1,30 @@
+use std::marker::PhantomData;
+
+use bevy_app::prelude::*;
 use bevy_ecs::{prelude::*, system::SystemParam};
 
 use moonshine_kind::prelude::*;
 
+use crate::transition::TransitionError;
 use crate::Behavior;
+
+pub struct BehaviorEventsPlugin<T: Behavior + Component>(PhantomData<T>);
+
+impl<T: Behavior + Component> Default for BehaviorEventsPlugin<T> {
+    fn default() -> Self {
+        Self(PhantomData)
+    }
+}
+
+impl<T: Behavior + Component> Plugin for BehaviorEventsPlugin<T> {
+    fn build(&self, app: &mut App) {
+        app.add_event::<Start<T>>()
+            .add_event::<Pause<T>>()
+            .add_event::<Resume<T>>()
+            .add_event::<Stop<T>>()
+            .add_event::<Error<T>>();
+    }
+}
 
 #[derive(SystemParam)]
 pub struct BehaviorEvents<'w, 's, T: Behavior + Component> {
@@ -10,6 +32,7 @@ pub struct BehaviorEvents<'w, 's, T: Behavior + Component> {
     pause: EventReader<'w, 's, Pause<T>>,
     resume: EventReader<'w, 's, Resume<T>>,
     stop: EventReader<'w, 's, Stop<T>>,
+    reject: EventReader<'w, 's, Error<T>>,
 }
 
 impl<T: Behavior + Component> BehaviorEvents<'_, '_, T> {
@@ -30,6 +53,12 @@ impl<T: Behavior + Component> BehaviorEvents<'_, '_, T> {
             .read()
             .map(|Stop { instance, behavior }| (*instance, behavior))
     }
+
+    pub fn error(&mut self) -> impl Iterator<Item = (Instance<T>, &TransitionError<T>)> + '_ {
+        self.reject
+            .read()
+            .map(|Error { instance, error }| (*instance, error))
+    }
 }
 
 #[derive(SystemParam)]
@@ -38,6 +67,7 @@ pub struct BehaviorEventsMut<'w, T: Behavior + Component> {
     pause: EventWriter<'w, Pause<T>>,
     resume: EventWriter<'w, Resume<T>>,
     stop: EventWriter<'w, Stop<T>>,
+    reject: EventWriter<'w, Error<T>>,
 }
 
 impl<T: Behavior + Component> BehaviorEventsMut<'_, T> {
@@ -56,25 +86,35 @@ impl<T: Behavior + Component> BehaviorEventsMut<'_, T> {
     pub(crate) fn stop(&mut self, instance: Instance<T>, behavior: T) {
         self.stop.send(Stop { instance, behavior });
     }
+
+    pub(crate) fn error(&mut self, instance: Instance<T>, error: TransitionError<T>) {
+        self.reject.send(Error { instance, error });
+    }
 }
 
 #[derive(Event)]
-pub(crate) struct Start<T: Behavior + Component> {
+struct Start<T: Behavior + Component> {
     pub instance: Instance<T>,
 }
 
 #[derive(Event)]
-pub(crate) struct Pause<T: Behavior + Component> {
+struct Pause<T: Behavior + Component> {
     pub instance: Instance<T>,
 }
 
 #[derive(Event)]
-pub(crate) struct Resume<T: Behavior + Component> {
+struct Resume<T: Behavior + Component> {
     pub instance: Instance<T>,
 }
 
 #[derive(Event)]
-pub(crate) struct Stop<T: Behavior + Component> {
+struct Stop<T: Behavior + Component> {
     pub instance: Instance<T>,
     pub behavior: T,
+}
+
+#[derive(Event)]
+pub(crate) struct Error<T: Behavior + Component> {
+    pub instance: Instance<T>,
+    pub error: TransitionError<T>,
 }

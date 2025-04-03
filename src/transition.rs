@@ -83,32 +83,3 @@ pub enum TransitionError<T: Behavior> {
     RejectedNext(T),
     NoPrevious,
 }
-
-pub type TransitionResult<T> = Result<(), TransitionError<T>>;
-
-#[derive(Component, Reflect)]
-#[reflect(Component)]
-pub struct TransitionResponse<T: Behavior> {
-    result: Option<TransitionResult<T>>,
-}
-
-impl<T: Behavior> TransitionResponse<T> {
-    pub fn take(mut this: Mut<Self>) -> Option<TransitionResult<T>> {
-        // NOTE: Do not call `take()` directly to avoid triggering change detection
-        if this.result.is_some() {
-            this.result.take()
-        } else {
-            None
-        }
-    }
-
-    pub(crate) fn set(&mut self, result: TransitionResult<T>) {
-        self.result = Some(result);
-    }
-}
-
-impl<T: Behavior> Default for TransitionResponse<T> {
-    fn default() -> Self {
-        Self { result: None }
-    }
-}
