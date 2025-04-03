@@ -114,7 +114,7 @@ struct Stop<T: Behavior + Component> {
 }
 
 #[derive(Event)]
-pub(crate) struct Error<T: Behavior + Component> {
+struct Error<T: Behavior + Component> {
     pub instance: Instance<T>,
     pub error: TransitionError<T>,
 }
