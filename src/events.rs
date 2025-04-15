@@ -18,19 +18,19 @@ impl<T: Behavior> Default for BehaviorEventsPlugin<T> {
 
 impl<T: Behavior> Plugin for BehaviorEventsPlugin<T> {
     fn build(&self, app: &mut App) {
-        app.add_event::<TransitionEvent<T>>();
+        app.add_event::<BehaviorEvent<T>>();
     }
 }
 
-pub type TransitionEvents<'w, 's, T> = EventReader<'w, 's, TransitionEvent<T>>;
-pub type TransitionEventsMut<'w, T> = EventWriter<'w, TransitionEvent<T>>;
+pub type BehaviorEvents<'w, 's, T> = EventReader<'w, 's, BehaviorEvent<T>>;
+pub type BehaviorEventsMut<'w, T> = EventWriter<'w, BehaviorEvent<T>>;
 
 /// An event sent during [`transition`](crate::transition::transition) to signal [`Behavior`] changes.
 ///
 /// # Usage
 ///
-/// Each successful transition results in either a [`Start`](TransitionEvent::Start),
-/// [`Pause`](TransitionEvent::Pause), [`Resume`](TransitionEvent::Resume), or [`Stop`](TransitionEvent::Stop) event.
+/// Each successful transition results in either a [`Start`](BehaviorEvent::Start),
+/// [`Pause`](BehaviorEvent::Pause), [`Resume`](BehaviorEvent::Resume), or [`Stop`](BehaviorEvent::Stop) event.
 ///
 /// Most events carry the [`Instance`](crate::Instance) and index of the associated behavior.
 ///
@@ -41,7 +41,7 @@ pub type TransitionEventsMut<'w, T> = EventWriter<'w, TransitionEvent<T>>;
 /// - More than one variation of the same state exists in the stack, or
 /// - Multiple transitions have ocurred since the last query.
 #[derive(Event, Debug, PartialEq)]
-pub enum TransitionEvent<T: Behavior> {
+pub enum BehaviorEvent<T: Behavior> {
     /// Sent when a behavior is started.
     Start {
         /// The instance which is running the new behavior.

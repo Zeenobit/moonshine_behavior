@@ -6,7 +6,7 @@ pub mod prelude {
         transition, Next, Previous, Reset, Transition, TransitionSequence,
     };
 
-    pub use crate::events::{TransitionEvent, TransitionEvents};
+    pub use crate::events::{BehaviorEvent, BehaviorEvents};
     pub use crate::plugin::BehaviorPlugin;
 
     pub use crate::match_next;
@@ -29,10 +29,10 @@ use bevy_ecs::{prelude::*, query::QueryData};
 use bevy_reflect::prelude::*;
 use bevy_utils::prelude::*;
 use bevy_utils::tracing::{debug, warn};
-use events::TransitionEventsMut;
+use events::BehaviorEventsMut;
 use moonshine_kind::prelude::*;
 
-use crate::events::TransitionEvent;
+use crate::events::BehaviorEvent;
 
 use self::transition::*;
 
@@ -51,7 +51,7 @@ pub trait Behavior: Component + Debug + Sized {
     /// Called before a new behavior is started.
     ///
     /// If this returns `false`, the transition fails.
-    /// See [`Error`](crate::events::TransitionEvent) for details on how to handle transition failures.
+    /// See [`Error`](crate::events::BehaviorEvent) for details on how to handle transition failures.
     fn filter_next(&self, next: &Self) -> bool {
         match_next! {
             self => next,
@@ -62,7 +62,7 @@ pub trait Behavior: Component + Debug + Sized {
     /// Called after a behavior is paused.
     ///
     /// If this returns `false`, the paused behavior will be stopped immediatedly and discarded.
-    /// No [`Pause`](crate::events::TransitionEvent) event will be sent in this case.
+    /// No [`Pause`](crate::events::BehaviorEvent) event will be sent in this case.
     fn is_resumable(&self) -> bool {
         match self {
             _ => true,
@@ -282,7 +282,7 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
     /// This operation pushes the current behavior onto the stack and inserts the new behavior.
     ///
     /// Note that this will fail if the current behavior rejects `next` through [`Behavior::filter_next`].
-    /// See [`Error`](crate::events::TransitionEvent) for details on how to handle transition failures.
+    /// See [`Error`](crate::events::BehaviorEvent) for details on how to handle transition failures.
     pub fn start(&mut self, next: T) {
         self.set_transition(Next(next));
     }
@@ -295,7 +295,7 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
     /// The initial behavior is never allowed to yield.
     ///
     /// Note that this will fail if the first non-yielding behavior rejects `next` through [`Behavior::filter_next`].
-    /// See [`Error`](crate::events::TransitionEvent) for details on how to handle transition failures.
+    /// See [`Error`](crate::events::BehaviorEvent) for details on how to handle transition failures.
     pub fn interrupt_start(&mut self, next: T) {
         self.set_transition(Interrupt(next));
     }
@@ -305,7 +305,7 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
     /// This operation pops the current behavior off the stack and resumes the previous behavior.
     ///
     /// Note that this will fail if the current behavior is the initial behavior.
-    /// See [`Error`](crate::events::TransitionEvent) for details on how to handle transition failures.
+    /// See [`Error`](crate::events::BehaviorEvent) for details on how to handle transition failures.
     pub fn stop(&mut self) {
         self.set_transition(Previous);
     }
@@ -332,7 +332,7 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
         &mut self,
         instance: Instance<T>,
         mut next: T,
-        events: &mut TransitionEventsMut<T>,
+        events: &mut BehaviorEventsMut<T>,
         commands: &mut Commands,
     ) -> bool {
         if self.filter_next(&next) {
@@ -349,8 +349,8 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
                     *self.current
                 );
                 previous.invoke_pause(&self.current, commands.instance(instance));
-                events.send(TransitionEvent::Pause { instance, index });
-                events.send(TransitionEvent::Start {
+                events.send(BehaviorEvent::Pause { instance, index });
+                events.send(BehaviorEvent::Start {
                     instance,
                     index: new_index,
                 });
@@ -361,8 +361,8 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
                     *self.current
                 );
                 previous.invoke_stop(&self.current, commands.instance(instance));
-                events.send(TransitionEvent::Start { instance, index });
-                events.send(TransitionEvent::Stop {
+                events.send(BehaviorEvent::Start { instance, index });
+                events.send(BehaviorEvent::Stop {
                     instance,
                     behavior: previous,
                 });
@@ -373,7 +373,7 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
                 "{instance:?}: transition {:?} -> {next:?} is not allowed",
                 *self.current
             );
-            events.send(TransitionEvent::Error {
+            events.send(BehaviorEvent::Error {
                 instance,
                 error: TransitionError::RejectedNext(next),
             });
@@ -385,7 +385,7 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
         &mut self,
         instance: Instance<T>,
         next: T,
-        events: &mut TransitionEventsMut<T>,
+        events: &mut BehaviorEventsMut<T>,
         commands: &mut Commands,
     ) {
         while self.filter_yield(&next) && !self.memory.is_empty() {
@@ -401,7 +401,7 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
                     next
                 };
                 previous.invoke_stop(&self.current, commands.instance(instance));
-                events.send(TransitionEvent::Stop {
+                events.send(BehaviorEvent::Stop {
                     instance,
                     behavior: previous,
                 });
@@ -414,7 +414,7 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
     fn pop(
         &mut self,
         instance: Instance<T>,
-        events: &mut TransitionEventsMut<T>,
+        events: &mut BehaviorEventsMut<T>,
         commands: &mut Commands,
     ) -> bool {
         let index = self.memory.len();
@@ -430,11 +430,11 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
             };
             self.invoke_resume(&previous, commands.instance(instance));
             previous.invoke_stop(&self.current, commands.instance(instance));
-            events.send(TransitionEvent::Resume {
+            events.send(BehaviorEvent::Resume {
                 instance,
                 index: next_index,
             });
-            events.send(TransitionEvent::Stop {
+            events.send(BehaviorEvent::Stop {
                 instance,
                 behavior: previous,
             });
@@ -444,7 +444,7 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
                 "{instance:?}: transition {:?} -> None is not allowed",
                 *self.current
             );
-            events.send(TransitionEvent::Error {
+            events.send(BehaviorEvent::Error {
                 instance,
                 error: TransitionError::NoPrevious,
             });
@@ -455,7 +455,7 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
     fn clear(
         &mut self,
         instance: Instance<T>,
-        events: &mut TransitionEventsMut<T>,
+        events: &mut BehaviorEventsMut<T>,
         commands: &mut Commands,
     ) {
         while self.memory.len() > 1 {
@@ -468,7 +468,7 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
                 *self.current
             );
             previous.invoke_stop(next, commands.instance(instance));
-            events.send(TransitionEvent::Stop {
+            events.send(BehaviorEvent::Stop {
                 instance,
                 behavior: previous,
             });

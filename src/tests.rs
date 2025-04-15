@@ -104,10 +104,10 @@ fn push_error() {
     assert_eq!(
         app.world_mut()
             .run_system_once(
-                |mut e: TransitionEvents<T>, q: Single<BehaviorRef<T>, (With<TA>, Without<TC>)>| {
+                |mut e: BehaviorEvents<T>, q: Single<BehaviorRef<T>, (With<TA>, Without<TC>)>| {
                     assert!(matches!(
                         e.read().skip(1).next(),
-                        Some(TransitionEvent::Error { .. })
+                        Some(BehaviorEvent::Error { .. })
                     ));
                     (q.previous().copied(), *q.current())
                 }
@@ -146,10 +146,10 @@ fn pop_initial() {
     assert_eq!(
         app.world_mut()
             .run_system_once(
-                |mut e: TransitionEvents<T>, q: Single<BehaviorRef<T>, With<TA>>| {
+                |mut e: BehaviorEvents<T>, q: Single<BehaviorRef<T>, With<TA>>| {
                     assert!(matches!(
                         e.read().skip(1).next(),
-                        Some(TransitionEvent::Error { .. })
+                        Some(BehaviorEvent::Error { .. })
                     ));
 
                     **q
@@ -366,10 +366,10 @@ fn interrupt_error() {
     assert_eq!(
         app.world_mut()
             .run_system_once(
-                |mut e: TransitionEvents<T>, q: Single<BehaviorRef<T>, (With<TA>, With<TB>)>| {
+                |mut e: BehaviorEvents<T>, q: Single<BehaviorRef<T>, (With<TA>, With<TB>)>| {
                     assert!(matches!(
                         e.read().skip(3).next(),
-                        Some(TransitionEvent::Error { .. })
+                        Some(BehaviorEvent::Error { .. })
                     ));
                     (q.previous().copied(), *q.current())
                 }

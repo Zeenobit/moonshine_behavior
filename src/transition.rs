@@ -6,8 +6,8 @@ use bevy_reflect::prelude::*;
 use bevy_utils::tracing::debug;
 use moonshine_kind::prelude::*;
 
-use crate::events::TransitionEvent;
-use crate::{Behavior, BehaviorExt, BehaviorMut, BehaviorMutItem, Memory, TransitionEventsMut};
+use crate::events::BehaviorEvent;
+use crate::{Behavior, BehaviorEventsMut, BehaviorExt, BehaviorMut, BehaviorMutItem, Memory};
 
 pub use self::Transition::{Interrupt, Next, Previous, Reset};
 
@@ -51,7 +51,7 @@ impl<T: Behavior + Clone> Clone for Transition<T> {
 }
 
 pub fn transition<T: Behavior>(
-    mut events: TransitionEventsMut<T>,
+    mut events: BehaviorEventsMut<T>,
     mut query: Query<
         (
             Instance<T>,
@@ -69,7 +69,7 @@ pub fn transition<T: Behavior>(
 
             // Send start event for the initial behavior
             behavior.invoke_start(None, commands.instance(instance));
-            events.send(TransitionEvent::Start { instance, index: 0 });
+            events.send(BehaviorEvent::Start { instance, index: 0 });
         }
 
         // Index of the stopped behavior, if applicable.

@@ -97,7 +97,7 @@ fn update_signal(
 }
 
 fn update_lights(
-    mut events: TransitionEvents<Signal>,
+    mut events: BehaviorEvents<Signal>,
     behavior: Query<BehaviorRef<Signal>>,
     green: Single<Entity, With<GreenLight>>,
     yellow: Single<Entity, With<YellowLight>>,
@@ -107,7 +107,7 @@ fn update_lights(
     use Signal::*;
 
     for event in events.read() {
-        use TransitionEvent::*;
+        use BehaviorEvent::*;
         match event {
             Start { instance, .. } => {
                 let behavior = behavior.get(instance.entity()).unwrap();
