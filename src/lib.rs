@@ -1,5 +1,6 @@
 pub mod prelude {
     pub use crate::{Behavior, BehaviorMut, BehaviorRef};
+    pub use moonshine_kind::{Instance, InstanceCommands};
 
     pub use crate::transition::{
         transition, Next, Previous, Reset, Transition, TransitionSequence,
@@ -20,7 +21,7 @@ mod tests;
 
 use std::fmt::Debug;
 use std::mem::{replace, swap};
-use std::ops::{Deref, DerefMut, Index};
+use std::ops::{Deref, DerefMut, Index, IndexMut};
 
 use bevy_derive::{Deref, DerefMut};
 use bevy_ecs::component::Tick;
@@ -35,11 +36,11 @@ use crate::events::TransitionEvent;
 
 use self::transition::*;
 
-pub trait Behavior: 'static + Debug + Send + Sync {
+pub trait Behavior: Component + Debug + Sized {
     /// Called when an interrupt is requested.
     ///
     /// If this returns `true`, the current behavior will stop to allow the next behavior to start.
-    /// Note that the initial behavior is never allowed to yield.
+    /// The initial behavior is never allowed to yield.
     fn filter_yield(&self, next: &Self) -> bool {
         match_next! {
             self => next,
@@ -50,7 +51,7 @@ pub trait Behavior: 'static + Debug + Send + Sync {
     /// Called before a new behavior is started.
     ///
     /// If this returns `false`, the transition fails.
-    /// See [`BehaviorEvents::error`](crate::events::BehaviorEvents) for details on how to handle transition failures.
+    /// See [`Error`](crate::events::TransitionEvent) for details on how to handle transition failures.
     fn filter_next(&self, next: &Self) -> bool {
         match_next! {
             self => next,
@@ -61,22 +62,64 @@ pub trait Behavior: 'static + Debug + Send + Sync {
     /// Called after a behavior is paused.
     ///
     /// If this returns `false`, the paused behavior will be stopped immediatedly and discarded.
-    /// Note that no [`pause`](crate::events::BehaviorEvents::pause) event will be sent in this case.
+    /// No [`Pause`](crate::events::TransitionEvent) event will be sent in this case.
     fn is_resumable(&self) -> bool {
         match self {
             _ => true,
         }
     }
+
+    /// Called during [`transition`](transition::transition) just after the behavior is started.
+    fn on_start(&self, _previous: Option<&Self>, _commands: InstanceCommands<Self>) {}
+
+    /// Called during [`transition`](transition::transition) just after the behavior is paused.
+    fn on_pause(&self, _current: &Self, _commands: InstanceCommands<Self>) {}
+
+    /// Called during [`transition`](transition::transition) just after the behavior is resumed.
+    fn on_resume(&self, _previous: &Self, _commands: InstanceCommands<Self>) {}
+
+    /// Called during [`transition`](transition::transition) just after the behavior is stopped.
+    fn on_stop(&self, _current: &Self, _commands: InstanceCommands<Self>) {}
+
+    /// Called during [`transition`](transition::transition) just after the behavior is started *or* resumed.
+    fn on_activate(&self, _previous: Option<&Self>, _commands: InstanceCommands<Self>) {}
+
+    /// Called during [`transition`](transition::transition) just after the behavior is paused *or* stopped.
+    fn on_suspend(&self, _current: &Self, _commands: InstanceCommands<Self>) {}
 }
 
+trait BehaviorExt: Behavior {
+    fn invoke_start(&self, previous: Option<&Self>, mut commands: InstanceCommands<Self>) {
+        self.on_start(previous, commands.reborrow());
+        self.on_activate(previous, commands);
+    }
+
+    fn invoke_pause(&self, current: &Self, mut commands: InstanceCommands<Self>) {
+        self.on_suspend(current, commands.reborrow());
+        self.on_pause(current, commands);
+    }
+
+    fn invoke_resume(&self, previous: &Self, mut commands: InstanceCommands<Self>) {
+        self.on_resume(previous, commands.reborrow());
+        self.on_activate(Some(previous), commands);
+    }
+
+    fn invoke_stop(&self, current: &Self, mut commands: InstanceCommands<Self>) {
+        self.on_suspend(current, commands.reborrow());
+        self.on_stop(current, commands);
+    }
+}
+
+impl<T: Behavior> BehaviorExt for T {}
+
 #[derive(QueryData)]
-pub struct BehaviorRef<T: Behavior + Component> {
+pub struct BehaviorRef<T: Behavior> {
     current: Ref<'static, T>,
     memory: &'static Memory<T>,
     transition: &'static Transition<T>,
 }
 
-impl<T: Behavior + Component> BehaviorRefItem<'_, T> {
+impl<T: Behavior> BehaviorRefItem<'_, T> {
     /// Returns the current [`Behavior`] state.
     pub fn current(&self) -> &T {
         &self.current
@@ -105,7 +148,7 @@ impl<T: Behavior + Component> BehaviorRefItem<'_, T> {
     }
 }
 
-impl<T: Behavior + Component> Deref for BehaviorRefItem<'_, T> {
+impl<T: Behavior> Deref for BehaviorRefItem<'_, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -113,13 +156,13 @@ impl<T: Behavior + Component> Deref for BehaviorRefItem<'_, T> {
     }
 }
 
-impl<T: Behavior + Component> AsRef<T> for BehaviorRefItem<'_, T> {
+impl<T: Behavior> AsRef<T> for BehaviorRefItem<'_, T> {
     fn as_ref(&self) -> &T {
         &self.current
     }
 }
 
-impl<T: Behavior + Component> DetectChanges for BehaviorRefItem<'_, T> {
+impl<T: Behavior> DetectChanges for BehaviorRefItem<'_, T> {
     fn is_added(&self) -> bool {
         self.current.is_added()
     }
@@ -133,7 +176,7 @@ impl<T: Behavior + Component> DetectChanges for BehaviorRefItem<'_, T> {
     }
 }
 
-impl<T: Behavior + Component> Index<usize> for BehaviorRefItem<'_, T> {
+impl<T: Behavior> Index<usize> for BehaviorRefItem<'_, T> {
     type Output = T;
 
     fn index(&self, index: usize) -> &Self::Output {
@@ -147,13 +190,13 @@ impl<T: Behavior + Component> Index<usize> for BehaviorRefItem<'_, T> {
 
 #[derive(QueryData)]
 #[query_data(mutable)]
-pub struct BehaviorMut<T: Behavior + Component> {
+pub struct BehaviorMut<T: Behavior> {
     current: Mut<'static, T>,
     memory: &'static mut Memory<T>,
     transition: &'static mut Transition<T>,
 }
 
-impl<T: Behavior + Component> BehaviorMutReadOnlyItem<'_, T> {
+impl<T: Behavior> BehaviorMutReadOnlyItem<'_, T> {
     pub fn current(&self) -> &T {
         &self.current
     }
@@ -171,7 +214,7 @@ impl<T: Behavior + Component> BehaviorMutReadOnlyItem<'_, T> {
     }
 }
 
-impl<T: Behavior + Component> Deref for BehaviorMutReadOnlyItem<'_, T> {
+impl<T: Behavior> Deref for BehaviorMutReadOnlyItem<'_, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -179,13 +222,13 @@ impl<T: Behavior + Component> Deref for BehaviorMutReadOnlyItem<'_, T> {
     }
 }
 
-impl<T: Behavior + Component> AsRef<T> for BehaviorMutReadOnlyItem<'_, T> {
+impl<T: Behavior> AsRef<T> for BehaviorMutReadOnlyItem<'_, T> {
     fn as_ref(&self) -> &T {
         self.current.as_ref()
     }
 }
 
-impl<T: Behavior + Component> DetectChanges for BehaviorMutReadOnlyItem<'_, T> {
+impl<T: Behavior> DetectChanges for BehaviorMutReadOnlyItem<'_, T> {
     fn is_added(&self) -> bool {
         self.current.is_added()
     }
@@ -199,7 +242,19 @@ impl<T: Behavior + Component> DetectChanges for BehaviorMutReadOnlyItem<'_, T> {
     }
 }
 
-impl<T: Behavior + Component> BehaviorMutItem<'_, T> {
+impl<T: Behavior> Index<usize> for BehaviorMutReadOnlyItem<'_, T> {
+    type Output = T;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        if index == self.memory.stack.len() {
+            self.current()
+        } else {
+            &self.memory[index]
+        }
+    }
+}
+
+impl<T: Behavior> BehaviorMutItem<'_, T> {
     pub fn current(&self) -> &T {
         &self.current
     }
@@ -221,13 +276,13 @@ impl<T: Behavior + Component> BehaviorMutItem<'_, T> {
     }
 }
 
-impl<T: Behavior + Component> BehaviorMutItem<'_, T> {
+impl<T: Behavior> BehaviorMutItem<'_, T> {
     /// Starts the given `next` behavior.
     ///
     /// This operation pushes the current behavior onto the stack and inserts the new behavior.
     ///
     /// Note that this will fail if the current behavior rejects `next` through [`Behavior::filter_next`].
-    /// See [`BehaviorEvents::error`](crate::events::BehaviorEvents) for details on how to handle transition failures.
+    /// See [`Error`](crate::events::TransitionEvent) for details on how to handle transition failures.
     pub fn start(&mut self, next: T) {
         self.set_transition(Next(next));
     }
@@ -240,7 +295,7 @@ impl<T: Behavior + Component> BehaviorMutItem<'_, T> {
     /// The initial behavior is never allowed to yield.
     ///
     /// Note that this will fail if the first non-yielding behavior rejects `next` through [`Behavior::filter_next`].
-    /// See [`BehaviorEvents::error`](crate::events::BehaviorEvents) for details on how to handle transition failures.
+    /// See [`Error`](crate::events::TransitionEvent) for details on how to handle transition failures.
     pub fn interrupt_start(&mut self, next: T) {
         self.set_transition(Interrupt(next));
     }
@@ -250,7 +305,7 @@ impl<T: Behavior + Component> BehaviorMutItem<'_, T> {
     /// This operation pops the current behavior off the stack and resumes the previous behavior.
     ///
     /// Note that this will fail if the current behavior is the initial behavior.
-    /// See [`BehaviorEvents::error`](crate::events::BehaviorEvents) for details on how to handle transition failures.
+    /// See [`Error`](crate::events::TransitionEvent) for details on how to handle transition failures.
     pub fn stop(&mut self) {
         self.set_transition(Previous);
     }
@@ -278,12 +333,14 @@ impl<T: Behavior + Component> BehaviorMutItem<'_, T> {
         instance: Instance<T>,
         mut next: T,
         events: &mut TransitionEventsMut<T>,
+        commands: &mut Commands,
     ) -> bool {
         if self.filter_next(&next) {
             let previous = {
                 swap(self.current.as_mut(), &mut next);
                 next
             };
+            self.invoke_start(Some(&previous), commands.instance(instance));
             let index = self.memory.len();
             if previous.is_resumable() {
                 let new_index = index + 1;
@@ -291,6 +348,7 @@ impl<T: Behavior + Component> BehaviorMutItem<'_, T> {
                     "{instance:?}: {previous:?} (#{index}) -> {:?} (#{new_index})",
                     *self.current
                 );
+                previous.invoke_pause(&self.current, commands.instance(instance));
                 events.send(TransitionEvent::Pause { instance, index });
                 events.send(TransitionEvent::Start {
                     instance,
@@ -298,6 +356,11 @@ impl<T: Behavior + Component> BehaviorMutItem<'_, T> {
                 });
                 self.memory.push(previous);
             } else {
+                debug!(
+                    "{instance:?}: {previous:?} (#{index}) -> {:?} (#{index})",
+                    *self.current
+                );
+                previous.invoke_stop(&self.current, commands.instance(instance));
                 events.send(TransitionEvent::Start { instance, index });
                 events.send(TransitionEvent::Stop {
                     instance,
@@ -318,19 +381,26 @@ impl<T: Behavior + Component> BehaviorMutItem<'_, T> {
         }
     }
 
-    fn interrupt(&mut self, instance: Instance<T>, next: T, events: &mut TransitionEventsMut<T>) {
+    fn interrupt(
+        &mut self,
+        instance: Instance<T>,
+        next: T,
+        events: &mut TransitionEventsMut<T>,
+        commands: &mut Commands,
+    ) {
         while self.filter_yield(&next) && !self.memory.is_empty() {
             let index = self.memory.len();
-            if let Some(mut previous) = self.memory.pop() {
-                let previous_index = self.memory.len();
+            if let Some(mut next) = self.memory.pop() {
+                let next_index = self.memory.len();
                 debug!(
-                    "{instance:?}: {:?} (#{index}) -> {previous:?} (#{previous_index})",
+                    "{instance:?}: {:?} (#{index}) -> {next:?} (#{next_index})",
                     *self.current
                 );
                 let previous = {
-                    swap(self.current.as_mut(), &mut previous);
-                    previous
+                    swap(self.current.as_mut(), &mut next);
+                    next
                 };
+                previous.invoke_stop(&self.current, commands.instance(instance));
                 events.send(TransitionEvent::Stop {
                     instance,
                     behavior: previous,
@@ -338,26 +408,36 @@ impl<T: Behavior + Component> BehaviorMutItem<'_, T> {
             }
         }
 
-        self.push(instance, next, events);
+        self.push(instance, next, events, commands);
     }
 
-    fn pop(&mut self, instance: Instance<T>, events: &mut TransitionEventsMut<T>) -> bool {
+    fn pop(
+        &mut self,
+        instance: Instance<T>,
+        events: &mut TransitionEventsMut<T>,
+        commands: &mut Commands,
+    ) -> bool {
         let index = self.memory.len();
-        if let Some(mut previous) = self.memory.pop() {
-            let previous_index = self.memory.len();
+        if let Some(mut next) = self.memory.pop() {
+            let next_index = self.memory.len();
             debug!(
-                "{instance:?}: {:?} (#{index}) -> {previous:?} (#{previous_index})",
+                "{instance:?}: {:?} (#{index}) -> {next:?} (#{next_index})",
                 *self.current
             );
-            let behavior = {
-                swap(self.current.as_mut(), &mut previous);
-                previous
+            let previous = {
+                swap(self.current.as_mut(), &mut next);
+                next
             };
+            self.invoke_resume(&previous, commands.instance(instance));
+            previous.invoke_stop(&self.current, commands.instance(instance));
             events.send(TransitionEvent::Resume {
                 instance,
-                index: previous_index,
+                index: next_index,
             });
-            events.send(TransitionEvent::Stop { instance, behavior });
+            events.send(TransitionEvent::Stop {
+                instance,
+                behavior: previous,
+            });
             true
         } else {
             warn!(
@@ -372,20 +452,33 @@ impl<T: Behavior + Component> BehaviorMutItem<'_, T> {
         }
     }
 
-    fn clear(&mut self, instance: Instance<T>, events: &mut TransitionEventsMut<T>) {
+    fn clear(
+        &mut self,
+        instance: Instance<T>,
+        events: &mut TransitionEventsMut<T>,
+        commands: &mut Commands,
+    ) {
         while self.memory.len() > 1 {
+            let index = self.memory.len();
             let previous = self.memory.pop().unwrap();
+            let next_index = self.memory.len();
+            let next = self.memory.last().unwrap();
+            debug!(
+                "{instance:?}: {:?} (#{index}) -> {next:?} (#{next_index})",
+                *self.current
+            );
+            previous.invoke_stop(next, commands.instance(instance));
             events.send(TransitionEvent::Stop {
                 instance,
                 behavior: previous,
             });
         }
 
-        self.pop(instance, events);
+        self.pop(instance, events, commands);
     }
 }
 
-impl<T: Behavior + Component> Deref for BehaviorMutItem<'_, T> {
+impl<T: Behavior> Deref for BehaviorMutItem<'_, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -393,13 +486,13 @@ impl<T: Behavior + Component> Deref for BehaviorMutItem<'_, T> {
     }
 }
 
-impl<T: Behavior + Component> DerefMut for BehaviorMutItem<'_, T> {
+impl<T: Behavior> DerefMut for BehaviorMutItem<'_, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.current_mut()
     }
 }
 
-impl<T: Behavior + Component> DetectChanges for BehaviorMutItem<'_, T> {
+impl<T: Behavior> DetectChanges for BehaviorMutItem<'_, T> {
     fn is_added(&self) -> bool {
         self.current.is_added()
     }
@@ -413,7 +506,7 @@ impl<T: Behavior + Component> DetectChanges for BehaviorMutItem<'_, T> {
     }
 }
 
-impl<T: Behavior + Component> DetectChangesMut for BehaviorMutItem<'_, T> {
+impl<T: Behavior> DetectChangesMut for BehaviorMutItem<'_, T> {
     type Inner = T;
 
     fn set_changed(&mut self) {
@@ -429,15 +522,37 @@ impl<T: Behavior + Component> DetectChangesMut for BehaviorMutItem<'_, T> {
     }
 }
 
-impl<T: Behavior + Component> AsRef<T> for BehaviorMutItem<'_, T> {
+impl<T: Behavior> AsRef<T> for BehaviorMutItem<'_, T> {
     fn as_ref(&self) -> &T {
         self.current.as_ref()
     }
 }
 
-impl<T: Behavior + Component> AsMut<T> for BehaviorMutItem<'_, T> {
+impl<T: Behavior> AsMut<T> for BehaviorMutItem<'_, T> {
     fn as_mut(&mut self) -> &mut T {
         self.current.as_mut()
+    }
+}
+
+impl<T: Behavior> Index<usize> for BehaviorMutItem<'_, T> {
+    type Output = T;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        if index == self.memory.stack.len() {
+            self.current()
+        } else {
+            &self.memory[index]
+        }
+    }
+}
+
+impl<T: Behavior> IndexMut<usize> for BehaviorMutItem<'_, T> {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        if index == self.memory.stack.len() {
+            self.current_mut()
+        } else {
+            &mut self.memory[index]
+        }
     }
 }
 

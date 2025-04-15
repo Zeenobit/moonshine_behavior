@@ -4,10 +4,10 @@ use std::fmt::Debug;
 use bevy_ecs::prelude::*;
 use bevy_reflect::prelude::*;
 use bevy_utils::tracing::debug;
-use moonshine_kind::Instance;
+use moonshine_kind::prelude::*;
 
 use crate::events::TransitionEvent;
-use crate::{Behavior, BehaviorMut, BehaviorMutItem, Memory, TransitionEventsMut};
+use crate::{Behavior, BehaviorExt, BehaviorMut, BehaviorMutItem, Memory, TransitionEventsMut};
 
 pub use self::Transition::{Interrupt, Next, Previous, Reset};
 
@@ -50,7 +50,7 @@ impl<T: Behavior + Clone> Clone for Transition<T> {
     }
 }
 
-pub fn transition<T: Behavior + Component>(
+pub fn transition<T: Behavior>(
     mut events: TransitionEventsMut<T>,
     mut query: Query<
         (
@@ -63,6 +63,15 @@ pub fn transition<T: Behavior + Component>(
     mut commands: Commands,
 ) {
     for (instance, mut behavior, sequence_opt) in &mut query {
+        if behavior.current.is_added() {
+            // Memory must be empty when the component is added
+            debug_assert!(behavior.memory.is_empty());
+
+            // Send start event for the initial behavior
+            behavior.invoke_start(None, commands.instance(instance));
+            events.send(TransitionEvent::Start { instance, index: 0 });
+        }
+
         // Index of the stopped behavior, if applicable.
         let mut stop_index = None;
 
@@ -70,29 +79,21 @@ pub fn transition<T: Behavior + Component>(
 
         match behavior.transition.take() {
             Next(next) => {
-                interrupt_sequence = !behavior.push(instance, next, &mut events);
+                interrupt_sequence = !behavior.push(instance, next, &mut events, &mut commands);
             }
             Previous => {
                 stop_index = Some(behavior.index());
-                interrupt_sequence = !behavior.pop(instance, &mut events);
+                interrupt_sequence = !behavior.pop(instance, &mut events, &mut commands);
             }
             Interrupt(next) => {
-                behavior.interrupt(instance, next, &mut events);
+                behavior.interrupt(instance, next, &mut events, &mut commands);
                 interrupt_sequence = true;
             }
             Reset => {
-                behavior.clear(instance, &mut events);
+                behavior.clear(instance, &mut events, &mut commands);
                 interrupt_sequence = true;
             }
-            _ => {
-                if behavior.current.is_added() {
-                    // Memory must be empty when the component is added
-                    debug_assert!(behavior.memory.is_empty());
-
-                    // Send start event for the initial behavior
-                    events.send(TransitionEvent::Start { instance, index: 0 });
-                }
-            }
+            _ => {}
         }
 
         let Some(sequence) = sequence_opt else {
@@ -180,7 +181,7 @@ impl<T: Behavior> TransitionSequence<T> {
     }
 }
 
-impl<T: Behavior + Component> TransitionSequence<T> {
+impl<T: Behavior> TransitionSequence<T> {
     pub(crate) fn update(
         mut this: Mut<Self>,
         instance: Instance<T>,
