@@ -5,7 +5,7 @@ use bevy_ecs::prelude::*;
 use bevy_reflect::{prelude::*, GetTypeRegistration, Typed};
 
 use crate::events::BehaviorEventsPlugin;
-use crate::{sequence::TransitionSequence, Behavior, Memory, Transition};
+use crate::{Behavior, Memory, Transition, TransitionSequence};
 
 pub struct BehaviorPlugin<T: Behavior>(PhantomData<T>);
 

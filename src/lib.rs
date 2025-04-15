@@ -1,19 +1,18 @@
 pub mod prelude {
     pub use crate::{Behavior, BehaviorMut, BehaviorRef};
 
-    pub use crate::transition::{transition, Next, Previous, Reset, Transition};
+    pub use crate::transition::{
+        transition, Next, Previous, Reset, Transition, TransitionSequence,
+    };
 
     pub use crate::events::{TransitionEvent, TransitionEvents};
     pub use crate::plugin::BehaviorPlugin;
-
-    pub use crate::sequence::TransitionSequence;
 
     pub use crate::match_next;
 }
 
 pub mod events;
 pub mod plugin;
-pub mod sequence;
 pub mod transition;
 
 #[cfg(test)]
@@ -274,7 +273,12 @@ impl<T: Behavior + Component> BehaviorMutItem<'_, T> {
         }
     }
 
-    fn push(&mut self, instance: Instance<T>, mut next: T, events: &mut TransitionEventsMut<T>) {
+    fn push(
+        &mut self,
+        instance: Instance<T>,
+        mut next: T,
+        events: &mut TransitionEventsMut<T>,
+    ) -> bool {
         if self.filter_next(&next) {
             let previous = {
                 swap(self.current.as_mut(), &mut next);
@@ -300,6 +304,7 @@ impl<T: Behavior + Component> BehaviorMutItem<'_, T> {
                     behavior: previous,
                 });
             }
+            true
         } else {
             warn!(
                 "{instance:?}: transition {:?} -> {next:?} is not allowed",
@@ -309,6 +314,7 @@ impl<T: Behavior + Component> BehaviorMutItem<'_, T> {
                 instance,
                 error: TransitionError::RejectedNext(next),
             });
+            false
         }
     }
 
@@ -335,7 +341,7 @@ impl<T: Behavior + Component> BehaviorMutItem<'_, T> {
         self.push(instance, next, events);
     }
 
-    fn pop(&mut self, instance: Instance<T>, events: &mut TransitionEventsMut<T>) {
+    fn pop(&mut self, instance: Instance<T>, events: &mut TransitionEventsMut<T>) -> bool {
         let index = self.memory.len();
         if let Some(mut previous) = self.memory.pop() {
             let previous_index = self.memory.len();
@@ -352,6 +358,7 @@ impl<T: Behavior + Component> BehaviorMutItem<'_, T> {
                 index: previous_index,
             });
             events.send(TransitionEvent::Stop { instance, behavior });
+            true
         } else {
             warn!(
                 "{instance:?}: transition {:?} -> None is not allowed",
@@ -361,6 +368,7 @@ impl<T: Behavior + Component> BehaviorMutItem<'_, T> {
                 instance,
                 error: TransitionError::NoPrevious,
             });
+            false
         }
     }
 
