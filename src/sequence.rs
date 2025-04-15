@@ -7,11 +7,11 @@ use crate::Behavior;
 
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-pub struct Sequence<T: Behavior> {
+pub struct TransitionSequence<T: Behavior> {
     queue: VecDeque<T>,
 }
 
-impl<T: Behavior> Sequence<T> {
+impl<T: Behavior> TransitionSequence<T> {
     pub fn new(items: impl IntoIterator<Item = T>) -> Self {
         Self {
             queue: VecDeque::from_iter(items),

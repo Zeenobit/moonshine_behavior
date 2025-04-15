@@ -6,7 +6,7 @@ pub mod prelude {
     pub use crate::events::{TransitionEvent, TransitionEvents};
     pub use crate::plugin::BehaviorPlugin;
 
-    pub use crate::sequence::Sequence;
+    pub use crate::sequence::TransitionSequence;
 
     pub use crate::match_next;
 }

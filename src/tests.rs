@@ -119,7 +119,7 @@ fn pop_initial() {
 #[test]
 fn sequence() {
     let mut app = app();
-    app.world_mut().spawn((A, Sequence::new([B, D])));
+    app.world_mut().spawn((A, TransitionSequence::new([B, D])));
     app.update();
     assert_eq!(
         app.world_mut()

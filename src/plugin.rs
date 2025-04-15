@@ -5,7 +5,7 @@ use bevy_ecs::prelude::*;
 use bevy_reflect::{prelude::*, GetTypeRegistration, Typed};
 
 use crate::events::BehaviorEventsPlugin;
-use crate::{sequence::Sequence, Behavior, Memory, Transition};
+use crate::{sequence::TransitionSequence, Behavior, Memory, Transition};
 
 pub struct BehaviorPlugin<T: Behavior>(PhantomData<T>);
 
@@ -20,7 +20,7 @@ impl<T: RegisterableBehavior + Component> Plugin for BehaviorPlugin<T> {
         app.add_plugins(BehaviorEventsPlugin::<T>::default())
             .register_type::<Transition<T>>()
             .register_type::<Memory<T>>()
-            .register_type::<Sequence<T>>()
+            .register_type::<TransitionSequence<T>>()
             .register_required_components::<T, Transition<T>>();
     }
 }
