@@ -94,7 +94,7 @@ impl<T: Behavior + Component> BehaviorRefItem<'_, T> {
     ///
     /// This index may be used to identify the exact unique behavior state when multiple similar states are in the stack.
     pub fn index(&self) -> usize {
-        self.memory.stack.len()
+        self.memory.len()
     }
 
     pub fn previous(&self) -> Option<&T> {
@@ -163,6 +163,10 @@ impl<T: Behavior + Component> BehaviorMutReadOnlyItem<'_, T> {
         self.memory.last()
     }
 
+    pub fn index(&self) -> usize {
+        self.memory.len()
+    }
+
     pub fn has_transition(&self) -> bool {
         !self.transition.is_none()
     }
@@ -207,6 +211,10 @@ impl<T: Behavior + Component> BehaviorMutItem<'_, T> {
 
     pub fn previous(&self) -> Option<&T> {
         self.memory.last()
+    }
+
+    pub fn index(&self) -> usize {
+        self.memory.len()
     }
 
     pub fn has_transition(&self) -> bool {

@@ -88,7 +88,6 @@ fn pop() {
     let mut app = app();
     app.world_mut().spawn((A, Next(B)));
     app.update();
-
     app.world_mut()
         .run_system_once(|mut q: Single<BehaviorMut<T>>| {
             q.stop();
@@ -119,8 +118,17 @@ fn pop_initial() {
 #[test]
 fn sequence() {
     let mut app = app();
-    app.world_mut().spawn((A, TransitionSequence::new([B, D])));
-    app.update();
+    app.world_mut().spawn((
+        A,
+        TransitionSequence::start(B) // A -> B
+            .then(C) // B -> C
+            .then_wait_for(D) // C -> D -> C
+            .then_stop() //  C -> B
+            .then_stop() // B -> A
+            .then(D), // A -> D
+    ));
+    app.update(); // None -> A
+    app.update(); // A -> B
     assert_eq!(
         app.world_mut()
             .run_system_once(|q: Single<BehaviorRef<T>>| { (q.previous().copied(), *q.current()) })
@@ -128,12 +136,53 @@ fn sequence() {
         (Some(A), B)
     );
 
+    app.update(); // B -> C
+    assert_eq!(
+        app.world_mut()
+            .run_system_once(|q: Single<BehaviorRef<T>>| { (q.previous().copied(), *q.current()) })
+            .unwrap(),
+        (Some(B), C)
+    );
+
+    app.update(); // C -> D
+    assert_eq!(
+        app.world_mut()
+            .run_system_once(|q: Single<BehaviorRef<T>>| { (q.previous().copied(), *q.current()) })
+            .unwrap(),
+        (Some(C), D)
+    );
+
+    // Stop D
     app.world_mut()
-        .run_system_once(|mut q: Query<BehaviorMut<T>>| {
-            q.single_mut().stop();
+        .run_system_once(|mut q: Single<BehaviorMut<T>>| {
+            q.stop();
         })
         .unwrap();
-    app.update();
+    app.update(); // D -> C
+    assert_eq!(
+        app.world_mut()
+            .run_system_once(|q: Single<BehaviorRef<T>>| { (q.previous().copied(), *q.current()) })
+            .unwrap(),
+        (Some(B), C)
+    );
+
+    app.update(); // C -> B
+    assert_eq!(
+        app.world_mut()
+            .run_system_once(|q: Single<BehaviorRef<T>>| { (q.previous().copied(), *q.current()) })
+            .unwrap(),
+        (Some(A), B)
+    );
+
+    app.update(); // B -> A
+    assert_eq!(
+        app.world_mut()
+            .run_system_once(|q: Single<BehaviorRef<T>>| { (q.previous().copied(), *q.current()) })
+            .unwrap(),
+        (None, A)
+    );
+
+    app.update(); // A -> D
     assert_eq!(
         app.world_mut()
             .run_system_once(|q: Single<BehaviorRef<T>>| { (q.previous().copied(), *q.current()) })
@@ -149,6 +198,10 @@ fn sequence() {
             .unwrap(),
         (Some(A), D)
     );
+    assert!(app
+        .world_mut()
+        .run_system_once(|q: Query<&TransitionSequence<T>>| { q.get_single().is_err() })
+        .unwrap());
 }
 
 #[test]
@@ -225,7 +278,7 @@ fn interrupt_error() {
         app.world_mut()
             .run_system_once(|mut e: TransitionEvents<T>, q: Single<BehaviorRef<T>>| {
                 assert!(matches!(
-                    e.read().next(),
+                    e.read().skip(2).next(),
                     Some(TransitionEvent::Error { .. })
                 ));
                 (q.previous().copied(), *q.current())

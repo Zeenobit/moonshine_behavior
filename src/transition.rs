@@ -58,34 +58,43 @@ pub fn transition<T: Behavior + Component>(
         ),
         TransitionChanged<T>,
     >,
+    mut commands: Commands,
 ) {
     for (instance, mut behavior, sequence_opt) in &mut query {
+        let mut stop_index = None;
         match behavior.transition.take() {
             Next(next) => {
                 behavior.push(instance, next, &mut events);
-                continue;
             }
             Interrupt(next) => {
                 behavior.interrupt(instance, next, &mut events);
                 continue;
             }
-            Previous => behavior.pop(instance, &mut events),
+            Previous => {
+                stop_index = Some(behavior.index());
+                behavior.pop(instance, &mut events);
+            }
             Reset => behavior.clear(instance, &mut events),
             _ => {
                 if behavior.current.is_added() {
                     // Send start event for the initial behavior
+                    debug_assert!(behavior.memory.is_empty());
                     events.send(TransitionEvent::Start { instance, index: 0 });
                 }
             }
         }
 
-        if let Some(next) = sequence_opt.map(|mut sequence| sequence.pop()).flatten() {
-            behavior.push(instance, next, &mut events)
+        if let Some(sequence) = sequence_opt {
+            if sequence.is_empty() {
+                commands.entity(*instance).remove::<TransitionSequence<T>>();
+            } else {
+                TransitionSequence::update(sequence, behavior, stop_index);
+            }
         }
     }
 }
 
-pub type TransitionChanged<T> = Or<(Changed<Transition<T>>, Changed<TransitionSequence<T>>)>;
+pub type TransitionChanged<T> = Or<(Changed<Transition<T>>, With<TransitionSequence<T>>)>;
 
 #[derive(Debug, PartialEq, Reflect)]
 pub enum TransitionError<T: Behavior> {
