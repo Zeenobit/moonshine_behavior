@@ -68,13 +68,18 @@ pub fn transition<T: Behavior + Component>(
             }
             Interrupt(next) => {
                 behavior.interrupt(instance, next, &mut events);
+                commands.entity(*instance).remove::<TransitionSequence<T>>();
                 continue;
             }
             Previous => {
                 stop_index = Some(behavior.index());
                 behavior.pop(instance, &mut events);
             }
-            Reset => behavior.clear(instance, &mut events),
+            Reset => {
+                behavior.clear(instance, &mut events);
+                commands.entity(*instance).remove::<TransitionSequence<T>>();
+                continue;
+            }
             _ => {
                 if behavior.current.is_added() {
                     // Send start event for the initial behavior
