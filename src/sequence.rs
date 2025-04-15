@@ -41,6 +41,10 @@ impl<T: Behavior> TransitionSequence<T> {
         sequence
     }
 
+    pub fn wait_for(next: T) -> Self {
+        Self::empty().then_wait_for(next)
+    }
+
     pub fn then(mut self, next: T) -> Self {
         self.push(TransitionSequenceElement::Start(next));
         self
