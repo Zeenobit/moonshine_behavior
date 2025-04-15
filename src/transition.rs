@@ -4,7 +4,8 @@ use bevy_ecs::prelude::*;
 use bevy_reflect::prelude::*;
 use moonshine_kind::Instance;
 
-use crate::{sequence::Sequence, Behavior, BehaviorEventsMut, BehaviorMut, Memory};
+use crate::events::TransitionEvent;
+use crate::{sequence::Sequence, Behavior, BehaviorMut, Memory, TransitionEventsMut};
 
 pub use self::Transition::{Interrupt, Next, Previous, Reset};
 
@@ -48,7 +49,7 @@ impl<T: Behavior + Clone> Clone for Transition<T> {
 }
 
 pub fn transition<T: Behavior + Component>(
-    mut events: BehaviorEventsMut<T>,
+    mut events: TransitionEventsMut<T>,
     mut query: Query<(Instance<T>, BehaviorMut<T>, Option<&mut Sequence<T>>), TransitionChanged<T>>,
 ) {
     for (instance, mut behavior, sequence_opt) in &mut query {
@@ -65,7 +66,8 @@ pub fn transition<T: Behavior + Component>(
             Reset => behavior.clear(instance, &mut events),
             _ => {
                 if behavior.current.is_added() {
-                    events.start(instance);
+                    // Send start event for the initial behavior
+                    events.send(TransitionEvent::Start { instance, index: 0 });
                 }
             }
         }
@@ -78,7 +80,7 @@ pub fn transition<T: Behavior + Component>(
 
 pub type TransitionChanged<T> = Or<(Changed<Transition<T>>, Changed<Sequence<T>>)>;
 
-#[derive(Debug, Reflect)]
+#[derive(Debug, PartialEq, Reflect)]
 pub enum TransitionError<T: Behavior> {
     RejectedNext(T),
     NoPrevious,

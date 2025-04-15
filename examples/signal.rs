@@ -97,7 +97,7 @@ fn update_signal(
 }
 
 fn update_lights(
-    mut events: BehaviorEvents<Signal>,
+    mut events: TransitionEvents<Signal>,
     behavior: Query<BehaviorRef<Signal>>,
     green: Single<Entity, With<GreenLight>>,
     yellow: Single<Entity, With<YellowLight>>,
@@ -105,38 +105,42 @@ fn update_lights(
     mut fill: Query<&mut ShapeFill>,
 ) {
     use Signal::*;
-    for instance in events.start() {
-        let behavior = behavior.get(instance.entity()).unwrap();
-        match behavior.current() {
-            Green => fill.get_mut(*green).unwrap().color = GREEN_COLOR,
-            Yellow(_) => fill.get_mut(*yellow).unwrap().color = YELLOW_COLOR,
-            Red => fill.get_mut(*red).unwrap().color = RED_COLOR,
-        };
-    }
 
-    for instance in events.resume() {
-        let behavior = behavior.get(instance.entity()).unwrap();
-        match behavior.current() {
-            Green => fill.get_mut(*green).unwrap().color = GREEN_COLOR,
-            Yellow(_) => fill.get_mut(*yellow).unwrap().color = YELLOW_COLOR,
-            Red => fill.get_mut(*red).unwrap().color = RED_COLOR,
-        };
-    }
-
-    for instance in events.pause() {
-        let behavior = behavior.get(instance.entity()).unwrap();
-        match behavior.previous().unwrap() {
-            Green => fill.get_mut(*green).unwrap().color = GREEN_COLOR.darker(0.6),
-            Yellow(_) => fill.get_mut(*yellow).unwrap().color = YELLOW_COLOR.darker(0.6),
-            Red => fill.get_mut(*red).unwrap().color = RED_COLOR.darker(0.6),
-        }
-    }
-
-    for (_instance, behavior) in events.stop() {
-        match behavior {
-            Green => fill.get_mut(*green).unwrap().color = OFF_COLOR,
-            Yellow(_) => fill.get_mut(*yellow).unwrap().color = OFF_COLOR,
-            Red => fill.get_mut(*red).unwrap().color = OFF_COLOR,
+    for event in events.read() {
+        use TransitionEvent::*;
+        match event {
+            Start { instance, .. } => {
+                let behavior = behavior.get(instance.entity()).unwrap();
+                match behavior.current() {
+                    Green => fill.get_mut(*green).unwrap().color = GREEN_COLOR,
+                    Yellow(_) => fill.get_mut(*yellow).unwrap().color = YELLOW_COLOR,
+                    Red => fill.get_mut(*red).unwrap().color = RED_COLOR,
+                };
+            }
+            Pause { instance, .. } => {
+                let behavior = behavior.get(instance.entity()).unwrap();
+                match behavior.previous().unwrap() {
+                    Green => fill.get_mut(*green).unwrap().color = GREEN_COLOR.darker(0.6),
+                    Yellow(_) => fill.get_mut(*yellow).unwrap().color = YELLOW_COLOR.darker(0.6),
+                    Red => fill.get_mut(*red).unwrap().color = RED_COLOR.darker(0.6),
+                }
+            }
+            Resume { instance, .. } => {
+                let behavior = behavior.get(instance.entity()).unwrap();
+                match behavior.current() {
+                    Green => fill.get_mut(*green).unwrap().color = GREEN_COLOR,
+                    Yellow(_) => fill.get_mut(*yellow).unwrap().color = YELLOW_COLOR,
+                    Red => fill.get_mut(*red).unwrap().color = RED_COLOR,
+                };
+            }
+            Stop { behavior, .. } => match behavior {
+                Green => fill.get_mut(*green).unwrap().color = OFF_COLOR,
+                Yellow(_) => fill.get_mut(*yellow).unwrap().color = OFF_COLOR,
+                Red => fill.get_mut(*red).unwrap().color = OFF_COLOR,
+            },
+            Error { error, .. } => {
+                error!("{error:?}");
+            }
         }
     }
 }

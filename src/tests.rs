@@ -71,8 +71,11 @@ fn push_error() {
     app.update();
     assert_eq!(
         app.world_mut()
-            .run_system_once(|mut e: BehaviorEvents<T>, q: Single<BehaviorRef<T>>| {
-                assert!(e.error().next().is_some());
+            .run_system_once(|mut e: TransitionEvents<T>, q: Single<BehaviorRef<T>>| {
+                assert!(matches!(
+                    e.read().next(),
+                    Some(TransitionEvent::Error { .. })
+                ));
                 (q.previous().copied(), *q.current())
             })
             .unwrap(),
@@ -220,8 +223,11 @@ fn interrupt_error() {
     app.update();
     assert_eq!(
         app.world_mut()
-            .run_system_once(|mut e: BehaviorEvents<T>, q: Single<BehaviorRef<T>>| {
-                assert!(e.error().next().is_some());
+            .run_system_once(|mut e: TransitionEvents<T>, q: Single<BehaviorRef<T>>| {
+                assert!(matches!(
+                    e.read().next(),
+                    Some(TransitionEvent::Error { .. })
+                ));
                 (q.previous().copied(), *q.current())
             })
             .unwrap(),

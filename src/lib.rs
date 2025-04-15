@@ -3,7 +3,7 @@ pub mod prelude {
 
     pub use crate::transition::{transition, Next, Previous, Reset, Transition};
 
-    pub use crate::events::BehaviorEvents;
+    pub use crate::events::{TransitionEvent, TransitionEvents};
     pub use crate::plugin::BehaviorPlugin;
 
     pub use crate::sequence::Sequence;
@@ -21,7 +21,7 @@ mod tests;
 
 use std::fmt::Debug;
 use std::mem::{replace, swap};
-use std::ops::{Deref, DerefMut};
+use std::ops::{Deref, DerefMut, Index};
 
 use bevy_derive::{Deref, DerefMut};
 use bevy_ecs::component::Tick;
@@ -29,8 +29,10 @@ use bevy_ecs::{prelude::*, query::QueryData};
 use bevy_reflect::prelude::*;
 use bevy_utils::prelude::*;
 use bevy_utils::tracing::{debug, warn};
-use events::BehaviorEventsMut;
+use events::TransitionEventsMut;
 use moonshine_kind::prelude::*;
+
+use crate::events::TransitionEvent;
 
 use self::transition::*;
 
@@ -76,8 +78,23 @@ pub struct BehaviorRef<T: Behavior + Component> {
 }
 
 impl<T: Behavior + Component> BehaviorRefItem<'_, T> {
+    /// Returns the current [`Behavior`] state.
     pub fn current(&self) -> &T {
         &self.current
+    }
+
+    /// Returns the index associated with the current [`Behavior`] state.
+    ///
+    /// # Usage
+    ///
+    /// Each behavior state is associated with an index which corresponds to their position in the stack.
+    ///
+    /// The current behavior is always at the top of the stack.
+    /// The initial behavior always has the index of `0``.
+    ///
+    /// This index may be used to identify the exact unique behavior state when multiple similar states are in the stack.
+    pub fn index(&self) -> usize {
+        self.memory.stack.len()
     }
 
     pub fn previous(&self) -> Option<&T> {
@@ -114,6 +131,18 @@ impl<T: Behavior + Component> DetectChanges for BehaviorRefItem<'_, T> {
 
     fn last_changed(&self) -> Tick {
         self.current.last_changed()
+    }
+}
+
+impl<T: Behavior + Component> Index<usize> for BehaviorRefItem<'_, T> {
+    type Output = T;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        if index == self.memory.stack.len() {
+            self.current()
+        } else {
+            &self.memory[index]
+        }
     }
 }
 
@@ -237,67 +266,103 @@ impl<T: Behavior + Component> BehaviorMutItem<'_, T> {
         }
     }
 
-    fn push(&mut self, instance: Instance<T>, mut next: T, events: &mut BehaviorEventsMut<T>) {
+    fn push(&mut self, instance: Instance<T>, mut next: T, events: &mut TransitionEventsMut<T>) {
         if self.filter_next(&next) {
             let previous = {
                 swap(self.current.as_mut(), &mut next);
                 next
             };
-            debug!("{instance:?}: {previous:?} -> {:?}", *self.current);
+            let index = self.memory.len();
             if previous.is_resumable() {
-                events.pause(instance);
+                let new_index = index + 1;
+                debug!(
+                    "{instance:?}: {previous:?} (#{index}) -> {:?} (#{new_index})",
+                    *self.current
+                );
+                events.send(TransitionEvent::Pause { instance, index });
+                events.send(TransitionEvent::Start {
+                    instance,
+                    index: new_index,
+                });
                 self.memory.push(previous);
             } else {
-                events.stop(instance, previous);
+                events.send(TransitionEvent::Start { instance, index });
+                events.send(TransitionEvent::Stop {
+                    instance,
+                    behavior: previous,
+                });
             }
-            events.start(instance);
-            //self.set_result(Ok(()));
         } else {
             warn!(
                 "{instance:?}: transition {:?} -> {next:?} is not allowed",
                 *self.current
             );
-            events.error(instance, TransitionError::RejectedNext(next));
+            events.send(TransitionEvent::Error {
+                instance,
+                error: TransitionError::RejectedNext(next),
+            });
         }
     }
 
-    fn interrupt(&mut self, instance: Instance<T>, next: T, events: &mut BehaviorEventsMut<T>) {
+    fn interrupt(&mut self, instance: Instance<T>, next: T, events: &mut TransitionEventsMut<T>) {
         while self.filter_yield(&next) && !self.memory.is_empty() {
+            let index = self.memory.len();
             if let Some(mut previous) = self.memory.pop() {
-                debug!("{instance:?}: {:?} -> {previous:?}", *self.current);
+                let previous_index = self.memory.len();
+                debug!(
+                    "{instance:?}: {:?} (#{index}) -> {previous:?} (#{previous_index})",
+                    *self.current
+                );
                 let previous = {
                     swap(self.current.as_mut(), &mut previous);
                     previous
                 };
-                events.stop(instance, previous);
+                events.send(TransitionEvent::Stop {
+                    instance,
+                    behavior: previous,
+                });
             }
         }
 
         self.push(instance, next, events);
     }
 
-    fn pop(&mut self, instance: Instance<T>, events: &mut BehaviorEventsMut<T>) {
+    fn pop(&mut self, instance: Instance<T>, events: &mut TransitionEventsMut<T>) {
+        let index = self.memory.len();
         if let Some(mut previous) = self.memory.pop() {
-            debug!("{instance:?}: {:?} -> {previous:?}", *self.current);
-            let previous = {
+            let previous_index = self.memory.len();
+            debug!(
+                "{instance:?}: {:?} (#{index}) -> {previous:?} (#{previous_index})",
+                *self.current
+            );
+            let behavior = {
                 swap(self.current.as_mut(), &mut previous);
                 previous
             };
-            events.resume(instance);
-            events.stop(instance, previous);
+            events.send(TransitionEvent::Resume {
+                instance,
+                index: previous_index,
+            });
+            events.send(TransitionEvent::Stop { instance, behavior });
         } else {
             warn!(
                 "{instance:?}: transition {:?} -> None is not allowed",
                 *self.current
             );
-            events.error(instance, TransitionError::NoPrevious);
+            events.send(TransitionEvent::Error {
+                instance,
+                error: TransitionError::NoPrevious,
+            });
         }
     }
 
-    fn clear(&mut self, instance: Instance<T>, events: &mut BehaviorEventsMut<T>) {
+    fn clear(&mut self, instance: Instance<T>, events: &mut TransitionEventsMut<T>) {
         while self.memory.len() > 1 {
             let previous = self.memory.pop().unwrap();
-            events.stop(instance, previous);
+            events.send(TransitionEvent::Stop {
+                instance,
+                behavior: previous,
+            });
         }
 
         self.pop(instance, events);
