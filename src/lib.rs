@@ -88,7 +88,8 @@ pub trait Behavior: Component + Debug + Sized {
     fn on_suspend(&self, _current: &Self, _commands: InstanceCommands<Self>) {}
 }
 
-trait BehaviorExt: Behavior {
+#[doc(hidden)]
+trait BehaviorHooks: Behavior {
     fn invoke_start(&self, previous: Option<&Self>, mut commands: InstanceCommands<Self>) {
         self.on_start(previous, commands.reborrow());
         self.on_activate(previous, commands);
@@ -110,13 +111,14 @@ trait BehaviorExt: Behavior {
     }
 }
 
-impl<T: Behavior> BehaviorExt for T {}
+impl<T: Behavior> BehaviorHooks for T {}
 
 #[derive(QueryData)]
 pub struct BehaviorRef<T: Behavior> {
     current: Ref<'static, T>,
     memory: &'static Memory<T>,
     transition: &'static Transition<T>,
+    sequence: Has<TransitionSequence<T>>,
 }
 
 impl<T: Behavior> BehaviorRefItem<'_, T> {
@@ -139,12 +141,48 @@ impl<T: Behavior> BehaviorRefItem<'_, T> {
         self.memory.len()
     }
 
+    /// Returns the previous [`Behavior`] state in the stack.
+    ///
+    /// # Usage
+    ///
+    /// Note that this is **NOT** the previously active state.
+    /// Instead, this is the previous state which was active before the current one was started.
+    ///
+    /// To access the previously active state, handle [`BehaviorEvents`](crate::events::BehaviorEvents) instead.
     pub fn previous(&self) -> Option<&T> {
         self.memory.last()
     }
 
+    /// Returns `true` if there is any pending [`Transition`] for this [`Behavior`].
+    ///
+    /// # Usage
+    ///
+    /// By design, only one transition is allowed per [`transition`](crate::transition::transition) cycle.
+    ///
+    /// The only exception to this rule is if the behavior is interrupted or reset where multiple states
+    /// may be stopped within a single cycle.
+    ///
+    /// If a transition is requested while another is pending, it would be overriden.
+    /// The transition helper methods [`start`](BehaviorMutItem::start), [`interrupt_start`](BehaviorMutItem::interrupt_start),
+    /// [`stop`](BehaviorMutItem::stop) and [`reset`](BehaviorMutItem::reset) all trigger a warning in this case.
+    ///
+    /// Because of this, this method is useful to avoid unintentional transition overrides.
     pub fn has_transition(&self) -> bool {
         !self.transition.is_none()
+    }
+
+    /// Returns `true` if there is any [`TransitionSequence`] running on this [`Behavior`].
+    ///
+    /// This is useful to allow transition sequences to finish before starting a new behavior.
+    pub fn has_sequence(&self) -> bool {
+        self.sequence
+    }
+
+    /// Returns `true` if there are no pending transitions or any active [`TransitionSequence`] on this [`Behavior`].
+    ///
+    /// See [`has_transition`](BehaviorRefItem::has_transition) and [`has_sequence`](BehaviorRefItem::has_sequence) for more details.
+    pub fn is_stable(&self) -> bool {
+        !self.has_transition() && !self.has_sequence()
     }
 }
 
@@ -194,23 +232,38 @@ pub struct BehaviorMut<T: Behavior> {
     current: Mut<'static, T>,
     memory: &'static mut Memory<T>,
     transition: &'static mut Transition<T>,
+    sequence: Has<TransitionSequence<T>>,
 }
 
 impl<T: Behavior> BehaviorMutReadOnlyItem<'_, T> {
+    /// See [`BehaviorRefItem::current`].
     pub fn current(&self) -> &T {
         &self.current
     }
 
+    /// See [`BehaviorRefItem::previous`].
     pub fn previous(&self) -> Option<&T> {
         self.memory.last()
     }
 
+    /// See [`BehaviorRefItem::index`].
     pub fn index(&self) -> usize {
         self.memory.len()
     }
 
+    /// See [`BehaviorRefItem::has_transition`].
     pub fn has_transition(&self) -> bool {
         !self.transition.is_none()
+    }
+
+    /// See [`BehaviorRefItem::has_sequence`].
+    pub fn has_sequence(&self) -> bool {
+        self.sequence
+    }
+
+    /// See [`BehaviorRefItem::is_stable`].
+    pub fn is_stable(&self) -> bool {
+        !self.has_transition() && !self.has_sequence()
     }
 }
 
@@ -255,28 +308,41 @@ impl<T: Behavior> Index<usize> for BehaviorMutReadOnlyItem<'_, T> {
 }
 
 impl<T: Behavior> BehaviorMutItem<'_, T> {
+    /// Returns the current [`Behavior`] state.
     pub fn current(&self) -> &T {
         &self.current
     }
 
+    /// Returns the current [`Behavior`] state as a mutable.
     pub fn current_mut(&mut self) -> &mut T {
         self.current.as_mut()
     }
 
+    /// See [`BehaviorRefItem::previous`].
     pub fn previous(&self) -> Option<&T> {
         self.memory.last()
     }
 
+    /// See [`BehaviorRefItem::index`].
     pub fn index(&self) -> usize {
         self.memory.len()
     }
 
+    /// See [`BehaviorRefItem::has_transition`].
     pub fn has_transition(&self) -> bool {
         !self.transition.is_none()
     }
-}
 
-impl<T: Behavior> BehaviorMutItem<'_, T> {
+    /// See [`BehaviorRefItem::has_sequence`].
+    pub fn has_sequence(&self) -> bool {
+        self.sequence
+    }
+
+    /// See [`BehaviorRefItem::is_stable`].
+    pub fn is_stable(&self) -> bool {
+        !self.has_transition() && !self.has_sequence()
+    }
+
     /// Starts the given `next` behavior.
     ///
     /// This operation pushes the current behavior onto the stack and inserts the new behavior.

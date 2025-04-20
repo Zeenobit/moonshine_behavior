@@ -7,7 +7,7 @@ use bevy_utils::tracing::debug;
 use moonshine_kind::prelude::*;
 
 use crate::events::BehaviorEvent;
-use crate::{Behavior, BehaviorEventsMut, BehaviorExt, BehaviorMut, BehaviorMutItem, Memory};
+use crate::{Behavior, BehaviorEventsMut, BehaviorHooks, BehaviorMut, BehaviorMutItem, Memory};
 
 pub use self::Transition::{Interrupt, Next, Previous, Reset};
 
