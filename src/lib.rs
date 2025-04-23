@@ -153,6 +153,13 @@ impl<T: Behavior> BehaviorRefItem<'_, T> {
         self.memory.last()
     }
 
+    /// Returns an iterator over all [`Behavior`] states in the stack, including the current one.
+    ///
+    /// The iterator is ordered from the initial behavior (index = 0) to the current one.
+    pub fn iter(&self) -> impl Iterator<Item = &T> + '_ {
+        self.memory.iter().chain(std::iter::once(self.current()))
+    }
+
     /// Returns `true` if there is any pending [`Transition`] for this [`Behavior`].
     ///
     /// # Usage
@@ -246,6 +253,11 @@ impl<T: Behavior> BehaviorMutReadOnlyItem<'_, T> {
         self.memory.last()
     }
 
+    /// See [`BehaviorRefItem::iter`].
+    pub fn iter(&self) -> impl Iterator<Item = &T> + '_ {
+        self.memory.iter().chain(std::iter::once(self.current()))
+    }
+
     /// See [`BehaviorRefItem::index`].
     pub fn index(&self) -> usize {
         self.memory.len()
@@ -321,6 +333,22 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
     /// See [`BehaviorRefItem::previous`].
     pub fn previous(&self) -> Option<&T> {
         self.memory.last()
+    }
+
+    /// Returns the previous [`Behavior`] state as a mutable.
+    ///
+    /// See [`BehaviorRefItem::previous`] for more details.
+    pub fn previous_mut(&mut self) -> Option<&mut T> {
+        self.memory.last_mut()
+    }
+
+    /// Returns a mutable iterator over all [`Behavior`] states in the stack, including the current one.
+    ///
+    /// See [`BehaviorRefItem::iter`] for more details.
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut T> + '_ {
+        self.memory
+            .iter_mut()
+            .chain(std::iter::once(self.current.as_mut()))
     }
 
     /// See [`BehaviorRefItem::index`].
