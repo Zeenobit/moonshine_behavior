@@ -430,6 +430,8 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
     /// This operation stops all behaviors which yield to the new behavior and pushes it onto the stack.
     /// See [`Behavior::filter_yield`] for details on how to define how states yield to each other.
     ///
+    /// This also removes any remaining [`TransitionSequence`] steps.
+    ///
     /// The initial behavior is never allowed to yield.
     ///
     /// Note that this will fail if the first non-yielding behavior rejects `next` through [`Behavior::filter_next`].
