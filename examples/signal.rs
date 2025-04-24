@@ -109,24 +109,37 @@ fn update_lights(
     for event in events.read() {
         use BehaviorEvent::*;
         match event {
-            Start { instance, .. } => {
+            Start { instance, index } => {
                 let behavior = behavior.get(instance.entity()).unwrap();
+
+                // Multiple behavior states may have started since last query
+                // We only care about the last one:
+                if *index != behavior.index() {
+                    continue;
+                }
+
                 match behavior.current() {
                     Green => fill.get_mut(*green).unwrap().color = GREEN_COLOR,
                     Yellow(_) => fill.get_mut(*yellow).unwrap().color = YELLOW_COLOR,
                     Red => fill.get_mut(*red).unwrap().color = RED_COLOR,
                 };
             }
-            Pause { instance, .. } => {
+            Pause { instance, index } => {
                 let behavior = behavior.get(instance.entity()).unwrap();
+                if *index != behavior.index() {
+                    continue;
+                }
                 match behavior.previous().unwrap() {
                     Green => fill.get_mut(*green).unwrap().color = GREEN_COLOR.darker(0.6),
                     Yellow(_) => fill.get_mut(*yellow).unwrap().color = YELLOW_COLOR.darker(0.6),
                     Red => fill.get_mut(*red).unwrap().color = RED_COLOR.darker(0.6),
                 }
             }
-            Resume { instance, .. } => {
+            Resume { instance, index } => {
                 let behavior = behavior.get(instance.entity()).unwrap();
+                if *index != behavior.index() {
+                    continue;
+                }
                 match behavior.current() {
                     Green => fill.get_mut(*green).unwrap().color = GREEN_COLOR,
                     Yellow(_) => fill.get_mut(*yellow).unwrap().color = YELLOW_COLOR,
