@@ -47,29 +47,33 @@ pub enum BehaviorEvent<T: Behavior> {
         /// The instance which is running the new behavior.
         instance: Instance<T>,
         /// The index of the new behavior.
-        ///
-        /// Typically, for start events, this always matches the [current behavior index](crate::BehaviorRefItem::index).
-        /// The exception is if multiple behaviors were started on the same instance since the last query.
-        /// To access the behavior by index, use the [`index`](std::ops::Index::index) operator on a [`BehaviorRef`](crate::BehaviorRefItem).
         index: usize,
     },
     /// Sent when a behavior is paused.
     Pause {
         /// The instance which paused this behavior.
         instance: Instance<T>,
+        /// The index of the paused behavior.
         index: usize,
     },
+    /// Sent when a behavior is resumed.
     Resume {
+        /// The instance which resumed this behavior.
         instance: Instance<T>,
+        /// The index of the resumed behavior.
         index: usize,
     },
     Stop {
+        /// The instance which stopped this behavior.
         instance: Instance<T>,
+        /// The stopped behavior.
         behavior: T,
     },
     /// Sent when a behavior transition fails.
     Error {
+        /// The instance which failed to transition.
         instance: Instance<T>,
+        /// Reason for the failure.
         error: TransitionError<T>,
     },
 }
