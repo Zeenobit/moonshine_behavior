@@ -169,7 +169,7 @@ impl<T: Behavior> BehaviorRefItem<'_, T> {
     /// Note that this is **NOT** the previously active state.
     /// Instead, this is the previous state which was active before the current one was started.
     ///
-    /// To access the previously active state, handle [`BehaviorEvents`](crate::events::BehaviorEvents) instead.
+    /// To access the previously active state, handle [`Stop`](crate::events::BehaviorEvent::Stop) instead.
     pub fn previous(&self) -> Option<&T> {
         self.memory.last()
     }
