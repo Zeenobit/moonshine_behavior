@@ -358,6 +358,11 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
         self.memory.last_mut()
     }
 
+    /// See [`BehaviorRefItem::iter`].
+    pub fn iter(&self) -> impl Iterator<Item = &T> + '_ {
+        self.memory.iter().chain(std::iter::once(self.current()))
+    }
+
     /// Returns a mutable iterator over all [`Behavior`] states in the stack, including the current one.
     ///
     /// See [`BehaviorRefItem::iter`] for more details.
