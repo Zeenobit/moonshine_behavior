@@ -205,13 +205,6 @@ impl<T: Behavior> BehaviorRefItem<'_, T> {
     pub fn has_sequence(&self) -> bool {
         self.sequence
     }
-
-    /// Returns `true` if there are no pending transitions or any active [`TransitionSequence`] on this [`Behavior`].
-    ///
-    /// See [`has_transition`](BehaviorRefItem::has_transition) and [`has_sequence`](BehaviorRefItem::has_sequence) for more details.
-    pub fn is_stable(&self) -> bool {
-        !self.has_transition() && !self.has_sequence()
-    }
 }
 
 impl<T: Behavior> Deref for BehaviorRefItem<'_, T> {
@@ -300,11 +293,6 @@ impl<T: Behavior> BehaviorMutReadOnlyItem<'_, T> {
     pub fn has_sequence(&self) -> bool {
         self.sequence
     }
-
-    /// See [`BehaviorRefItem::is_stable`].
-    pub fn is_stable(&self) -> bool {
-        !self.has_transition() && !self.has_sequence()
-    }
 }
 
 impl<T: Behavior> Deref for BehaviorMutReadOnlyItem<'_, T> {
@@ -392,11 +380,6 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
     /// See [`BehaviorRefItem::has_sequence`].
     pub fn has_sequence(&self) -> bool {
         self.sequence
-    }
-
-    /// See [`BehaviorRefItem::is_stable`].
-    pub fn is_stable(&self) -> bool {
-        !self.has_transition() && !self.has_sequence()
     }
 
     /// Starts the given `next` behavior.
