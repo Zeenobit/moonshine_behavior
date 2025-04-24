@@ -113,6 +113,15 @@ trait BehaviorHooks: Behavior {
 
 impl<T: Behavior> BehaviorHooks for T {}
 
+/// Query data for a [`Behavior`].
+///
+/// # Usage
+///
+/// This provides a read-only reference to the current behavior state and all previous states in the stack.
+///
+/// Additionally, it provides methods to check for pending transitions ([`has_transition`](BehaviorRefItem::has_transition)),
+/// active transition sequences ([`has_sequence`](BehaviorRefItem::has_sequence)) and the current
+/// behavior index ([`index`](BehaviorRefItem::index)).
 #[derive(QueryData)]
 pub struct BehaviorRef<T: Behavior> {
     current: Ref<'static, T>,
@@ -122,7 +131,7 @@ pub struct BehaviorRef<T: Behavior> {
 }
 
 impl<T: Behavior> BehaviorRef<T> {
-    /// Creates a new [`BehaviorRef`]
+    /// Creates a new [`BehaviorRef`] item from an [`EntityRef`].
     pub fn from_entity(entity: EntityRef) -> Option<BehaviorRefItem<T>> {
         Some(BehaviorRefItem {
             current: entity.get_ref::<T>()?,
@@ -245,6 +254,13 @@ impl<T: Behavior> Index<usize> for BehaviorRefItem<'_, T> {
     }
 }
 
+/// Query data for a [`Behavior`] with mutable access.
+///
+/// # Usage
+///
+/// This provides a mutable reference to the current behavior state and all previous states in the stack.
+///
+/// See [`BehaviorRef`] for more details.
 #[derive(QueryData)]
 #[query_data(mutable)]
 pub struct BehaviorMut<T: Behavior> {
