@@ -378,3 +378,30 @@ fn interrupt_error() {
         (Some(A), B)
     );
 }
+
+#[test]
+fn try_start() {
+    let mut app = app();
+    app.world_mut().spawn(A);
+    app.update();
+
+    assert_eq!(
+        app.world_mut()
+            .run_system_once(|mut q: Single<BehaviorMut<T>>| {
+                q.try_start(B).unwrap();
+                q.try_start(D)
+            })
+            .unwrap(),
+        Err(D)
+    );
+
+    app.update();
+    assert_eq!(
+        app.world_mut()
+            .run_system_once(|q: Single<BehaviorRef<T>, (With<TA>, With<TB>)>| {
+                (q.previous().copied(), *q.current())
+            })
+            .unwrap(),
+        (Some(A), B)
+    );
+}

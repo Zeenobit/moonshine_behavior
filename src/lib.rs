@@ -392,6 +392,34 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
         self.set_transition(Next(next));
     }
 
+    /// Attempts to start the given `next` behavior if there are no pending transitions and the
+    /// current behavior allows it.
+    ///
+    /// Note that it's still possible for the transition to fail if the current behavior mutates
+    /// in such a way as to no longer allow the transition between the time this function is called
+    /// and when the [`transition`](crate::transition::transition) system runs.
+    ///
+    /// Do **NOT** use this method to react to transition failures.
+    /// See [`Error`](crate::events::BehaviorEvent) for details on how to correctly handle transition failures.
+    ///
+    /// # Usage
+    ///
+    /// This is similar to [`start`](BehaviorMutItem::start) but will return an error containing
+    /// the given `next` behavior if it fails.
+    ///
+    /// This is useful for fire-and-forget transitions where you don't want to override a
+    /// pending transition or may expect a transition failure.
+    ///
+    /// If multiple systems call this method before transition, only the first one will succeed.
+    pub fn try_start(&mut self, next: T) -> Result<(), T> {
+        if self.has_transition() || !self.filter_next(&next) {
+            return Err(next);
+        }
+
+        self.start(next);
+        Ok(())
+    }
+
     /// Interrupts the current behavior and starts the given `next` behavior.
     ///
     /// This operation stops all behaviors which yield to the new behavior and pushes it onto the stack.
