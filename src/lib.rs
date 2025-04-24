@@ -121,6 +121,18 @@ pub struct BehaviorRef<T: Behavior> {
     sequence: Has<TransitionSequence<T>>,
 }
 
+impl<T: Behavior> BehaviorRef<T> {
+    /// Creates a new [`BehaviorRef`]
+    pub fn from_entity(entity: EntityRef) -> Option<BehaviorRefItem<T>> {
+        Some(BehaviorRefItem {
+            current: entity.get_ref::<T>()?,
+            memory: entity.get::<Memory<T>>()?,
+            transition: entity.get::<Transition<T>>()?,
+            sequence: entity.contains::<TransitionSequence<T>>(),
+        })
+    }
+}
+
 impl<T: Behavior> BehaviorRefItem<'_, T> {
     /// Returns the current [`Behavior`] state.
     pub fn current(&self) -> &T {
