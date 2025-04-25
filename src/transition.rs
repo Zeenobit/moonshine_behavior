@@ -2,8 +2,8 @@ use std::collections::VecDeque;
 use std::fmt::Debug;
 
 use bevy_ecs::prelude::*;
+use bevy_log::prelude::*;
 use bevy_reflect::prelude::*;
-use bevy_utils::tracing::debug;
 use moonshine_kind::prelude::*;
 
 use crate::events::BehaviorEvent;
@@ -69,7 +69,7 @@ pub fn transition<T: Behavior>(
 
             // Send start event for the initial behavior
             behavior.invoke_start(None, commands.instance(instance));
-            events.send(BehaviorEvent::Start { instance, index: 0 });
+            events.write(BehaviorEvent::Start { instance, index: 0 });
         }
 
         // Index of the stopped behavior, if applicable.

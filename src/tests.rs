@@ -275,7 +275,7 @@ fn sequence() {
     );
     assert!(app
         .world_mut()
-        .run_system_once(|q: Query<&TransitionSequence<T>>| { q.get_single().is_err() })
+        .run_system_once(|q: Query<&TransitionSequence<T>>| { q.single().is_err() })
         .unwrap());
 }
 
@@ -294,8 +294,8 @@ fn interrupt() {
     );
 
     app.world_mut()
-        .run_system_once(|mut q: Query<BehaviorMut<T>>| {
-            q.single_mut().interrupt_start(D);
+        .run_system_once(|mut q: Single<BehaviorMut<T>>| {
+            q.interrupt_start(D);
         })
         .unwrap();
     app.update();

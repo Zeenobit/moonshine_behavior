@@ -1,7 +1,6 @@
 use std::time::Duration;
 
 use bevy::prelude::*;
-use bevy_vector_shapes::prelude::*;
 use moonshine_behavior::prelude::*;
 
 fn main() {
@@ -9,7 +8,7 @@ fn main() {
         .add_plugins((
             DefaultPlugins,
             BehaviorPlugin::<Signal>::default(),
-            Shape2dPlugin::default(),
+            //Shape2dPlugin::default(),
         ))
         .add_systems(Startup, (setup, spawn_lights))
         .add_systems(
@@ -40,42 +39,47 @@ impl Behavior for Signal {
 const GREEN_COLOR: Color = Color::srgb(0.2, 1., 0.);
 const YELLOW_COLOR: Color = Color::srgb(1., 0.8, 0.);
 const RED_COLOR: Color = Color::srgb(1., 0.2, 0.);
-const OFF_COLOR: Color = Color::srgb(0.2, 0.2, 0.2);
+const OFF_COLOR: Color = Color::srgb(0.1, 0.1, 0.1);
 
 #[derive(Component)]
+#[require(Transform, GlobalTransform)]
 struct GreenLight;
 
 #[derive(Component)]
+#[require(Transform, GlobalTransform)]
 struct YellowLight;
 
 #[derive(Component)]
+#[require(Transform, GlobalTransform)]
 struct RedLight;
 
-fn setup(mut commands: Commands) {
+fn setup(mut configs: ResMut<GizmoConfigStore>, mut commands: Commands) {
+    const HELP_TEXT: &str = "
+    Press 'Space' to start/reset the Signal cycle!\n";
+
     commands.spawn(Camera2d);
+    commands.spawn(Text::new(HELP_TEXT));
     commands.spawn(Signal::Green);
+
+    let (config, ..) = configs.config_mut::<DefaultGizmoConfigGroup>();
+    config.enabled = true;
+    config.line.width = 3.;
 }
 
 fn spawn_lights(mut commands: Commands) {
-    let mut config = ShapeConfig::default_2d();
-    config.color = OFF_COLOR;
-    config.set_translation((-50., 0., 0.).into());
-    commands.spawn((ShapeBundle::circle(&config, 20.), GreenLight));
-    config.set_translation((0., 0., 0.).into());
-    commands.spawn((ShapeBundle::circle(&config, 20.), YellowLight));
-    config.set_translation((50., 0., 0.).into());
-    commands.spawn((ShapeBundle::circle(&config, 20.), RedLight));
+    commands.spawn((Transform::from_xyz(-50., 0., 0.), GreenLight));
+    commands.spawn((Transform::from_xyz(0., 0., 0.), YellowLight));
+    commands.spawn((Transform::from_xyz(50., 0., 0.), RedLight));
 }
 
 fn update_signal(
     time: Res<Time>,
     key: Res<ButtonInput<KeyCode>>,
-    mut query: Query<BehaviorMut<Signal>>,
+    mut signal: Single<BehaviorMut<Signal>>,
 ) {
     use Signal::*;
 
-    let mut signal = query.single_mut();
-    match *signal {
+    match signal.current() {
         Green => {
             if key.just_pressed(KeyCode::Space) {
                 signal.start(Yellow(Duration::from_secs(3)));
@@ -83,7 +87,7 @@ fn update_signal(
         }
         Yellow(mut duration) => {
             duration = duration.saturating_sub(time.delta());
-            *signal = Yellow(duration);
+            **signal = Yellow(duration);
             if duration.is_zero() {
                 signal.start(Red);
             }
@@ -97,63 +101,48 @@ fn update_signal(
 }
 
 fn update_lights(
-    mut events: BehaviorEvents<Signal>,
-    behavior: Query<BehaviorRef<Signal>>,
+    mut gizmos: Gizmos,
+    query: Query<BehaviorRef<Signal>>,
     green: Single<Entity, With<GreenLight>>,
     yellow: Single<Entity, With<YellowLight>>,
     red: Single<Entity, With<RedLight>>,
-    mut fill: Query<&mut ShapeFill>,
+    transform: Query<&GlobalTransform>,
 ) {
     use Signal::*;
 
-    for event in events.read() {
-        use BehaviorEvent::*;
-        match event {
-            Start { instance, index } => {
-                let behavior = behavior.get(instance.entity()).unwrap();
+    let mut draw_circle = |entity: Entity, color: Color| {
+        let transform = transform.get(entity).unwrap();
+        gizmos.circle(transform.translation(), 20., color);
+    };
 
-                // Multiple behavior states may have started since last query
-                // We only care about the last one:
-                if *index != behavior.index() {
-                    continue;
-                }
+    for behavior in query.iter() {
+        // Rules for each light:
+        // - Stay on if it's the current signal
+        // - Dim if passed
+        // - Turn off otherwise
 
-                match behavior.current() {
-                    Green => fill.get_mut(*green).unwrap().color = GREEN_COLOR,
-                    Yellow(_) => fill.get_mut(*yellow).unwrap().color = YELLOW_COLOR,
-                    Red => fill.get_mut(*red).unwrap().color = RED_COLOR,
-                };
-            }
-            Pause { instance, index } => {
-                let behavior = behavior.get(instance.entity()).unwrap();
-                if *index != behavior.index() {
-                    continue;
-                }
-                match behavior.previous().unwrap() {
-                    Green => fill.get_mut(*green).unwrap().color = GREEN_COLOR.darker(0.6),
-                    Yellow(_) => fill.get_mut(*yellow).unwrap().color = YELLOW_COLOR.darker(0.6),
-                    Red => fill.get_mut(*red).unwrap().color = RED_COLOR.darker(0.6),
-                }
-            }
-            Resume { instance, index } => {
-                let behavior = behavior.get(instance.entity()).unwrap();
-                if *index != behavior.index() {
-                    continue;
-                }
-                match behavior.current() {
-                    Green => fill.get_mut(*green).unwrap().color = GREEN_COLOR,
-                    Yellow(_) => fill.get_mut(*yellow).unwrap().color = YELLOW_COLOR,
-                    Red => fill.get_mut(*red).unwrap().color = RED_COLOR,
-                };
-            }
-            Stop { behavior, .. } => match behavior {
-                Green => fill.get_mut(*green).unwrap().color = OFF_COLOR,
-                Yellow(_) => fill.get_mut(*yellow).unwrap().color = OFF_COLOR,
-                Red => fill.get_mut(*red).unwrap().color = OFF_COLOR,
-            },
-            Error { error, .. } => {
-                error!("{error:?}");
-            }
+        if matches!(*behavior, Green) {
+            draw_circle(*green, GREEN_COLOR);
+        } else if behavior.iter().any(|b| matches!(b, Green)) {
+            draw_circle(*green, GREEN_COLOR.darker(0.6));
+        } else {
+            draw_circle(*green, OFF_COLOR);
+        }
+
+        if matches!(*behavior, Yellow(..)) {
+            draw_circle(*yellow, YELLOW_COLOR);
+        } else if behavior.iter().any(|b| matches!(b, Yellow(..))) {
+            draw_circle(*yellow, YELLOW_COLOR.darker(0.6));
+        } else {
+            draw_circle(*yellow, OFF_COLOR);
+        }
+
+        if matches!(*behavior, Red) {
+            draw_circle(*red, RED_COLOR);
+        } else if behavior.iter().any(|b| matches!(b, Red)) {
+            draw_circle(*red, RED_COLOR.darker(0.6));
+        } else {
+            draw_circle(*red, OFF_COLOR);
         }
     }
 }

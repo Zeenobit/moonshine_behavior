@@ -8,13 +8,12 @@ homepage = "https://github.com/Zeenobit/moonshine_behavior"
 repository = "https://github.com/Zeenobit/moonshine_behavior"
 
 [dependencies]
-bevy_app = "0.15.*"
-bevy_ecs = "0.15.*"
-bevy_reflect = "0.15.*"
-bevy_utils = "0.15.*"
-bevy_derive = "0.15.*"
+bevy_app = "0.16.*"
+bevy_ecs = "0.16.*"
+bevy_reflect = "0.16.*"
+bevy_log = "0.16.*"
+bevy_derive = "0.16.*"
 moonshine-kind = { version = "0.2.*", path = "../core/crates/kind" }
 
 [dev-dependencies]
-bevy = "0.15.*"
-bevy_vector_shapes = "0.9.*"
+bevy = "0.16.*"

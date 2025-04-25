@@ -24,11 +24,11 @@ use std::mem::{replace, swap};
 use std::ops::{Deref, DerefMut, Index, IndexMut};
 
 use bevy_derive::{Deref, DerefMut};
-use bevy_ecs::component::Tick;
+use bevy_ecs::change_detection::MaybeLocation;
+use bevy_ecs::component::{Mutable, Tick};
 use bevy_ecs::{prelude::*, query::QueryData};
+use bevy_log::prelude::*;
 use bevy_reflect::prelude::*;
-use bevy_utils::prelude::*;
-use bevy_utils::tracing::{debug, warn};
 use events::BehaviorEventsMut;
 use moonshine_kind::prelude::*;
 
@@ -36,7 +36,7 @@ use crate::events::BehaviorEvent;
 
 use self::transition::*;
 
-pub trait Behavior: Component + Debug + Sized {
+pub trait Behavior: Component<Mutability = Mutable> + Debug + Sized {
     /// Called when an interrupt is requested.
     ///
     /// If this returns `true`, the current behavior will stop to allow the next behavior to start.
@@ -233,6 +233,14 @@ impl<T: Behavior> DetectChanges for BehaviorRefItem<'_, T> {
     fn last_changed(&self) -> Tick {
         self.current.last_changed()
     }
+
+    fn added(&self) -> Tick {
+        self.current.added()
+    }
+
+    fn changed_by(&self) -> MaybeLocation {
+        self.current.changed_by()
+    }
 }
 
 impl<T: Behavior> Index<usize> for BehaviorRefItem<'_, T> {
@@ -320,6 +328,14 @@ impl<T: Behavior> DetectChanges for BehaviorMutReadOnlyItem<'_, T> {
 
     fn last_changed(&self) -> Tick {
         self.current.last_changed()
+    }
+
+    fn added(&self) -> Tick {
+        self.current.added()
+    }
+
+    fn changed_by(&self) -> MaybeLocation {
+        self.current.changed_by()
     }
 }
 
@@ -489,8 +505,8 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
                     *self.current
                 );
                 previous.invoke_pause(&self.current, commands.instance(instance));
-                events.send(BehaviorEvent::Pause { instance, index });
-                events.send(BehaviorEvent::Start {
+                events.write(BehaviorEvent::Pause { instance, index });
+                events.write(BehaviorEvent::Start {
                     instance,
                     index: new_index,
                 });
@@ -501,8 +517,8 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
                     *self.current
                 );
                 previous.invoke_stop(&self.current, commands.instance(instance));
-                events.send(BehaviorEvent::Start { instance, index });
-                events.send(BehaviorEvent::Stop {
+                events.write(BehaviorEvent::Start { instance, index });
+                events.write(BehaviorEvent::Stop {
                     instance,
                     behavior: previous,
                 });
@@ -513,7 +529,7 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
                 "{instance:?}: transition {:?} -> {next:?} is not allowed",
                 *self.current
             );
-            events.send(BehaviorEvent::Error {
+            events.write(BehaviorEvent::Error {
                 instance,
                 error: TransitionError::RejectedNext(next),
             });
@@ -541,7 +557,7 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
                     next
                 };
                 previous.invoke_stop(&self.current, commands.instance(instance));
-                events.send(BehaviorEvent::Stop {
+                events.write(BehaviorEvent::Stop {
                     instance,
                     behavior: previous,
                 });
@@ -570,11 +586,11 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
             };
             self.invoke_resume(&previous, commands.instance(instance));
             previous.invoke_stop(&self.current, commands.instance(instance));
-            events.send(BehaviorEvent::Resume {
+            events.write(BehaviorEvent::Resume {
                 instance,
                 index: next_index,
             });
-            events.send(BehaviorEvent::Stop {
+            events.write(BehaviorEvent::Stop {
                 instance,
                 behavior: previous,
             });
@@ -584,7 +600,7 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
                 "{instance:?}: transition {:?} -> None is not allowed",
                 *self.current
             );
-            events.send(BehaviorEvent::Error {
+            events.write(BehaviorEvent::Error {
                 instance,
                 error: TransitionError::NoPrevious,
             });
@@ -608,7 +624,7 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
                 *self.current
             );
             previous.invoke_stop(next, commands.instance(instance));
-            events.send(BehaviorEvent::Stop {
+            events.write(BehaviorEvent::Stop {
                 instance,
                 behavior: previous,
             });
@@ -644,6 +660,14 @@ impl<T: Behavior> DetectChanges for BehaviorMutItem<'_, T> {
     fn last_changed(&self) -> Tick {
         self.current.last_changed()
     }
+
+    fn added(&self) -> Tick {
+        self.current.added()
+    }
+
+    fn changed_by(&self) -> MaybeLocation {
+        self.current.changed_by()
+    }
 }
 
 impl<T: Behavior> DetectChangesMut for BehaviorMutItem<'_, T> {
@@ -659,6 +683,14 @@ impl<T: Behavior> DetectChangesMut for BehaviorMutItem<'_, T> {
 
     fn bypass_change_detection(&mut self) -> &mut Self::Inner {
         self.current.bypass_change_detection()
+    }
+
+    fn set_added(&mut self) {
+        self.current.set_added()
+    }
+
+    fn set_last_added(&mut self, last_added: Tick) {
+        self.current.set_last_added(last_added)
     }
 }
 
@@ -704,7 +736,9 @@ struct Memory<T: Behavior> {
 
 impl<T: Behavior> Default for Memory<T> {
     fn default() -> Self {
-        Self { stack: default() }
+        Self {
+            stack: Vec::default(),
+        }
     }
 }
 
