@@ -1,20 +1,31 @@
 # 🎚️ Moonshine Behavior
-Minimalistic state machine for [Bevy](https://github.com/bevyengine/bevy) game engine.
+
+[![crates.io](https://img.shields.io/crates/v/moonshine-behavior)](https://crates.io/crates/moonshine-behavior)
+[![downloads](https://img.shields.io/crates/dr/moonshine-behavior?label=downloads)](https://crates.io/crates/moonshine-behavior)
+[![docs.rs](https://docs.rs/moonshine-behavior/badge.svg)](https://docs.rs/moonshine-behavior)
+[![license](https://img.shields.io/crates/l/moonshine-behavior)](https://github.com/Zeenobit/moonshine_behavior/blob/main/LICENSE)
+[![stars](https://img.shields.io/github/stars/Zeenobit/moonshine_behavior)](https://github.com/Zeenobit/moonshine_behavior)
+
+Minimalistic state machine for [Bevy](https://github.com/bevyengine/bevy) entities.
 
 ## Overview
 
 This crates is designed to provide a simple, stack-based implementation of state machines for Bevy entities.
 
 ### Features
+
 - Simple: Minimal overhead for defining and setting up behaviors.
 - Behaviors can be started, paused, resumed, and stopped.
-- Event driven API which allows systems to react to behavior changes on entities.
+- Event driven API which allows systems to react to behavior state change per entity.
 - Multiple behaviors with different types may exist on the same entity to define complex state machines.
 
 ## Usage
 
-A behavior, typically implemented as an `enum`, is a `Component` which represents some state of its entity. Each behavior is associated with a stack.
-When the next behavior is started, the current one is pushed onto the stack (if resumable) and paused.
+A behavior, typically implemented as an `enum`, is a [`Component`] which represents some state of its entity. Each behavior is associated with a **Stack**.
+
+When a new behavior starts, the current state is removed from the entity and pushed onto the stack (if resumable) and paused.
+
+When a behavior stops, the previous state is removed from the stack and inserted back into the entity.
 
 ### Setup
 
@@ -47,7 +58,8 @@ struct Bird {
 
 You may even use nested enums or structs to represent complex state machines:
 ```rust
-# use bevy::prelude::*;
+use bevy::prelude::*;
+
 #[derive(Component, Default, Debug, Reflect)]
 #[reflect(Component)]
 enum Bird {
@@ -77,143 +89,173 @@ struct Chirp {
 }
 ```
 
-#### 2. Implement the `Behavior` trait:
+#### 2. Implement the [`Behavior`] trait:
+
 ```rust,ignore
 impl Behavior for Bird {
-    fn allows_next(&self, next: &Self) -> bool {
+    fn filter_next(&self, next: &Self) -> bool {
         use Bird::*;
-        match self {
-            Idle => matches!(next, Sleep | Fly | Chirp),
-            Fly => matches!(next, Chirp),
-            Sleep | Chirp => false,
+        match_next! {
+            self => next,
+            Idle => Sleep | Fly | Chirp,
+            Fly => Chirp,
         }
     }
 }
 ```
+
 This trait defines the possible transitions for your behavior.
+
 In this example:
   - a bird may sleep, fly, or chirp when idle
   - a bird may chirp when flying
   - a bird may not do anything else when sleeping or chirping
 
+This trait has additional methods for more advanced usage. See [`Behavior`] trait documentation for full details.
+
 #### 3. Register the `Behavior` and its transition:
-Add a `BehaviorPlugin<T>` to your `App` to register the behavior events and types.
-Use `transition()` system to trigger behavior transitions whenever you want.
+Add a [`BehaviorPlugin`] and the [`transition`] system to your [`App`] to trigger behavior transitions whenever you want.
 ```rust,ignore
 app.add_plugins(BehaviorPlugin::<Bird>::default())
     .add_systems(Update, transition::<Bird>);
 ```
 
-You can define your systems before or after the `transition` system.
-Usually, systems that cause behavior change should run before transition while systems that handle behavior logic should run after transition.
+You may define your systems before or after the `transition` system.
+
+Usually, systems that cause behavior change should run before transition while systems that handle behavior logic should run after transition. However, this is not a strict requirement. Just be mindful of frame delays!
   
-#### 4. Spawn a `BehaviorBundle`:
-For behavior system to work, you must insert your behavior using a `BehaviorBundle`.
-This bundle also inserts an instance of your behavior. This is referred to as the **Initial Behavior**.
+#### 4. Spawn
+
+The first instance of `T` which is inserted into the entity is considered the **Initial Behavior**:
+```rust,ignore
+fn spawn_bird(mut commands: Commands) {
+    commands.spawn(Bird::Idle); // <--- Bird starts in Idle state
+}
+```
+
+You may also spawn a bird with a [`Transition`]:
+```rust,ignore
+fn spawn_bird(mut commands: Commands) {
+    commands.spawn((Bird::Idle, Next(Bird::Chirp))); // <--- Bird starts in Idle state and then Chirps!
+}
+```
+
+Or maybe even a [`TransitionSequence`]:
 
 ```rust,ignore
 fn spawn_bird(mut commands: Commands) {
-    commands.spawn(BehaviorBundle::<Bird>::default());
+    commands.spawn((
+        Bird::Idle,
+        TransitionSequence::new()
+            .then_wait_for(Bird::Chirp)
+            .then(Bird::Fly)
+        ));
 }
 ```
 
-To spawn a bird with a specific initial behavior use `BehaviorBundle::<B>::new()`.
+#### 5. Query
 
-> ⚠️ **WARNING**</br>
-> The initial behavior may never be stopped. Doing so would trigger an error.
+To manage the behavior of an entity, you may use the [`BehaviorRef<T>`] and [`BehaviorMut<T>`] [`Query`] terms:
+
+```rust,ignore
+fn update_bird(mut query: Query<BehaviorMut<Bird>>) {
+    for mut behavior in query.iter_mut() {
+        match behavior.current() {
+            Bird::Idle => {
+                // Do something when the bird is idle
+            }
+            Bird::Chirp => {
+                // TODO: Play Chirp sound!
+                behavior.stop(); // <-- Go back to the previous state
+            }
+            _ => { /* ... */ }
+        }
+    }
+}
+```
+
+`BehaviorRef<T>` is a read-only reference to the current behavior and the entire stack.
+
+`BehaviorMut<T>` extends `BehaviorRef<T>` and allows you to modify the behavior as well.
 
 ### Transitions
 
-TODO: Need up to date documentation.
-
-See [transition.rs](examples/transitions.rs) for examples.
-
-When a transition is requested, it is not invoked immediately. Instead, it is invoked whenever the registered `transition()` system is run.
-You may register your systems before or after `transition()` to perform any logic as required.
+When a transition is requested, it is not invoked immediately. Instead, it is invoked whenever the registered [`transition`] system is run.
+You may register your systems before or after `transition::<T>` to perform any logic as required.
 
 > ⚠️ **WARNING**<br/>
-> Be mindful that only one transition may be invoked per application update, per entity. This is an intentional design choice.
-> If multiple transitions are requested on the same entity within the same update cycle, only the last one is invoked, and a warning is logged.
+> In most cases, only one transition is allowed per entity, per cycle.
+>
+> This is by design to allow each state to get at least one active frame.
+>
+> The exception to this is during an interruption or a reset, where multiple behaviors may be stopped at once.
+
+To invoke a transition, you may use the [`BehaviorMut<T>`]. There are several methods for invoking transitions:
+
+- [`start`] Pauses the current behavior and starts a new one.
+- [`try_start`] Attempts to start a new behavior if there is currently no pending transition and the current behavior allows it.
+- [`interrupt_start`] Stops all behaviors which [yield][`filter_yield`] to the new behavior, and then starts the new behavior.
+- [`stop`] Stops the current behavior and resumes the previous one.
+- [`reset`] Stops all behaviors and resets the entity to its initial state.
+
+Regardless of the method used, all transition may fail if:
+- The new behavior does not allow the new behavior to start at the exact time of [`transition`]. See [`filter_next`].
+- The current behavior is the initial behavior and a stop is requested. The initial behavior may never be stopped.
+
+To completely stop the behavior, including the initial, you must remove the entire behavior from the entity.
+To do this, use [`remove_with_require::<T>()`](https://docs.rs/bevy/latest/bevy/ecs/prelude/struct.EntityCommands.html#method.remove_with_requires) to remove the initial behavior and the entire behavior stack.
 
 ### Events
 
-Any time a transition is invoked, an associated event is dispatched. These events may be used by other systems to react to behavior changes.
+Any time a transition is invoked, a [`BehaviorEvent`] is sent. These events may be used by other systems to react to behavior changes.
 
-Each event (except `StoppedEvent`) carries only the entity ID for which the behavior was started, paused, or resumed. `StoppedEvent` carries the entity ID in additional to the stopped behavior data.
+See [documentation][`BehaviorEvent`] for complete details and usage examples.
 
-For `StartedEvent` and `ResumedEvent`, the behavior exists on the entity itself.
-You may access it either using a normal query (e.g. `Query<&Bird>`), or using `BehaviorRef`.
+### Hooks
+
+In addition to events, you may also use hooks to perform immediate actions during a [`transition`]. Hooks are methods on the [`Behavior`] trait which may optionally be implemented by you:
+
 ```rust,ignore
-fn on_chirp_started(mut events: Started<Bird>, query: Query<BehaviorRef<Bird>>) {
-    for event in events.iter() {
-        let entity = event.entity();
-        let behavior = query.get(entity).unwrap();
-        if let Chirp = *behavior {
-            info!("{entity:?} has started chirping!");
-        }
-    }
-}
-
-fn on_chirp_resumed(mut events: Resumed<Bird>, query: Query<BehaviorRef<Bird>>) {
-    for event in events.iter() {
-        let entity = event.entity();
-        let behavior = query.get(entity).unwrap();
-        if let Chirp = *behavior {
-            info!("{entity:?} is chirping again!");
+impl Behavior for Bird {
+    fn on_start(&self, _previous: Option<&Self>, mut commands: InstanceCommands<Self>) {
+        match self {
+            Bird::Chirp => {
+                commands.insert(PlayAudio { /* ... */});
+            }
+            _ => { /* ... */ }
         }
     }
 }
 ```
-For `PausedEvent`, the paused behavior is the previous behavior on the data, which is accessible using `.previous()`:
-```rust,ignore
-fn on_chirp_paused(mut events: Paused<Bird>, query: Query<BehaviorRef<Bird>>) {
-    for event in events.iter() {
-        let entity = event.entity();
-        let behavior = query.get(entity).unwrap();
-        if let Chirp = behavior.previous() {
-            info!("{entity:?} is no longer chirping.");
-        }
-    }
-}
-```
-For `StoppedEvent`, the stopped behavior is accessible through the event itself:
-```rust,ignore
-fn on_chirp_stopped(mut events: Stopped<Bird>) {
-    for event in events.iter() {
-        let entity = event.entity();
-        let behavior = event.behavior();
-        if let Chirp = *behavior {
-            info!("{entity:?} has stopped chirping.");
-        }
-    }
-}
-```
-### Activation/Suspension
 
-In some cases, it may be necessary to run some logic if a behavior is paused OR stopped (suspension), or started OR resumed (activation).<br/>
-To handle activation and suspension, you may use a standard [`Changed`](https://docs.rs/bevy/latest/bevy/ecs/query/struct.Changed.html) query:
-```rust,ignore
-fn on_chirp_activated(query: Query<BehaviorRef<Bird>, Changed<Bird>>) {
-    if let Ok(behavior) = query.get_single() {
-        if let Chirp = *behavior {
-            info!("{entity:?} is chirping!");
-        }        
-    }
-}
-
-fn on_chirp_suspended(query: Query<BehaviorRef<Bird>, Changed<Bird>>) {
-    if let Ok(behavior) = query.get_single() {
-        if let Chirp = behavior.previous() {
-            info!("{entity:?} is not chirping.");
-        }        
-    }
-}
-```
+These hook commands would be executed immediately after [`transition`] is invoked. They are mainly useful when trying to minimize frame delays between state changes.
 
 ## Examples
 
-See [bird.rs](examples/bird.rs) for a complete implementation of the `Bird` behavior.
+See [signal.rs](examples/signal.rs) for a complete example.
 
 ## Support
 
-Find me on Bevy Discord server, or post an issue.
+Please [post an issue](https://github.com/Zeenobit/moonshine_behavior/issues/new) for any bugs, questions, or suggestions.
+
+You may also contact me on the official [Bevy Discord](https://discord.gg/bevy) server as **@Zeenobit**.
+
+[`Entity`]:https://docs.rs/bevy/latest/bevy/ecs/entity/struct.Entity.html
+[`Component`]:https://docs.rs/bevy/latest/bevy/ecs/component/trait.Component.html
+[`App`]:https://docs.rs/bevy/latest/bevy/app/struct.App.html
+[`Query`]:https://docs.rs/bevy/latest/bevy/ecs/system/struct.Query.html
+[`Behavior`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/trait.Behavior.html
+[`BehaviorPlugin`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/struct.BehaviorPlugin.html
+[`transition`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/fn.transition.html
+[`Transition`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/struct.Transition.html
+[`TransitionSequence`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/struct.TransitionSequence.html
+[`BehaviorEvent`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/struct.BehaviorEvent.html
+[`BehaviorRef<T>`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/struct.BehaviorRef.html
+[`BehaviorMut<T>`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/struct.BehaviorMut.html
+[`start`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/struct.BehaviorMut.html#method.start
+[`try_start`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/struct.BehaviorMut.html#method.try_start
+[`interrupt_start`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/struct.BehaviorMut.html#method.interrupt_start
+[`stop`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/struct.BehaviorMut.html#method.stop
+[`reset`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/struct.BehaviorMut.html#method.reset
+[`filter_yield`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/trait.Behavior.html#method.filter_yield
+[`filter_next`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/trait.Behavior.html#method.filter_next
