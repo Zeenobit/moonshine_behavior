@@ -1,13 +1,14 @@
 use std::collections::VecDeque;
 use std::fmt::Debug;
 
+use bevy_ecs::component::Components;
 use bevy_ecs::prelude::*;
 use bevy_log::prelude::*;
 use bevy_reflect::prelude::*;
 use moonshine_kind::prelude::*;
 
-use crate::events::BehaviorEvent;
-use crate::{Behavior, BehaviorEventsMut, BehaviorHooks, BehaviorMut, BehaviorMutItem, Memory};
+use crate::events::OnStart;
+use crate::{Behavior, BehaviorHooks, BehaviorMut, BehaviorMutItem, Memory};
 
 pub use self::Transition::{Interrupt, Next, Previous, Reset};
 
@@ -51,7 +52,7 @@ impl<T: Behavior + Clone> Clone for Transition<T> {
 }
 
 pub fn transition<T: Behavior>(
-    mut events: BehaviorEventsMut<T>,
+    mut components: &Components,
     mut query: Query<
         (
             Instance<T>,
@@ -69,7 +70,8 @@ pub fn transition<T: Behavior>(
 
             // Send start event for the initial behavior
             behavior.invoke_start(None, commands.instance(instance));
-            events.write(BehaviorEvent::Start { instance, index: 0 });
+            let id = components.valid_component_id::<T>().unwrap();
+            commands.trigger_targets(OnStart { index: 0 }, (*instance, id));
         }
 
         // Index of the stopped behavior, if applicable.
@@ -79,18 +81,18 @@ pub fn transition<T: Behavior>(
 
         match behavior.transition.take() {
             Next(next) => {
-                interrupt_sequence = !behavior.push(instance, next, &mut events, &mut commands);
+                interrupt_sequence = !behavior.push(instance, next, components, &mut commands);
             }
             Previous => {
                 stop_index = Some(behavior.index());
-                interrupt_sequence = !behavior.pop(instance, &mut events, &mut commands);
+                interrupt_sequence = !behavior.pop(instance, components, &mut commands);
             }
             Interrupt(next) => {
-                behavior.interrupt(instance, next, &mut events, &mut commands);
+                behavior.interrupt(instance, next, components, &mut commands);
                 interrupt_sequence = true;
             }
             Reset => {
-                behavior.clear(instance, &mut events, &mut commands);
+                behavior.clear(instance, components, &mut commands);
                 interrupt_sequence = true;
             }
             _ => {}

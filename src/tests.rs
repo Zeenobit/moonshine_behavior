@@ -1,5 +1,6 @@
 use bevy::{ecs::system::RunSystemOnce, prelude::*};
 
+use crate::events::OnError;
 use crate::prelude::*;
 
 use self::T::*;
@@ -61,6 +62,9 @@ struct TC;
 #[derive(Component)]
 struct TD;
 
+#[derive(Resource)]
+struct ErrorTriggered;
+
 fn app() -> App {
     let mut app = App::new();
     app.add_plugins((MinimalPlugins, BehaviorPlugin::<T>::default()))
@@ -99,22 +103,20 @@ fn push() {
 #[test]
 fn push_error() {
     let mut app = app();
-    app.world_mut().spawn((A, Next(C)));
-    app.update();
-    assert_eq!(
-        app.world_mut()
-            .run_system_once(
-                |mut e: BehaviorEvents<T>, q: Single<BehaviorRef<T>, (With<TA>, Without<TC>)>| {
-                    assert!(matches!(
-                        e.read().skip(1).next(),
-                        Some(BehaviorEvent::Error { .. })
-                    ));
-                    (q.previous().copied(), *q.current())
-                }
-            )
-            .unwrap(),
-        (None, A)
+    let e = app.world_mut().spawn((A, Next(C))).id();
+
+    app.add_observer(
+        move |trigger: Trigger<OnError<T>, T>,
+              q: Single<BehaviorRef<T>, (With<TA>, Without<TC>)>,
+              mut commands: Commands| {
+            assert_eq!(**q, A);
+            assert_eq!(trigger.target(), e);
+            commands.insert_resource(ErrorTriggered);
+        },
     );
+
+    app.update();
+    assert!(app.world().contains_resource::<ErrorTriggered>());
 }
 
 #[test]
@@ -141,23 +143,20 @@ fn pop() {
 #[test]
 fn pop_initial() {
     let mut app = app();
-    app.world_mut().spawn((A, Previous::<T>));
-    app.update();
-    assert_eq!(
-        app.world_mut()
-            .run_system_once(
-                |mut e: BehaviorEvents<T>, q: Single<BehaviorRef<T>, With<TA>>| {
-                    assert!(matches!(
-                        e.read().skip(1).next(),
-                        Some(BehaviorEvent::Error { .. })
-                    ));
+    let e = app.world_mut().spawn((A, Previous::<T>)).id();
 
-                    **q
-                }
-            )
-            .unwrap(),
-        A
+    app.add_observer(
+        move |trigger: Trigger<OnError<T>, T>,
+              q: Single<BehaviorRef<T>, With<TA>>,
+              mut commands: Commands| {
+            assert_eq!(**q, A);
+            assert_eq!(trigger.target(), e);
+            commands.insert_resource(ErrorTriggered);
+        },
     );
+
+    app.update();
+    assert!(app.world().contains_resource::<ErrorTriggered>());
 }
 
 #[test]
@@ -346,7 +345,8 @@ fn interrupt_push() {
 #[test]
 fn interrupt_error() {
     let mut app = app();
-    app.world_mut().spawn((A, Next(B)));
+    let e = app.world_mut().spawn((A, Next(B))).id();
+
     app.update();
     assert_eq!(
         app.world_mut()
@@ -362,18 +362,23 @@ fn interrupt_error() {
             q.interrupt_start(A);
         })
         .unwrap();
+
+    app.add_observer(
+        move |trigger: Trigger<OnError<T>, T>,
+              q: Single<BehaviorRef<T>, With<TA>>,
+              mut commands: Commands| {
+            assert_eq!(**q, B);
+            assert_eq!(trigger.target(), e);
+            commands.insert_resource(ErrorTriggered);
+        },
+    );
+
     app.update();
     assert_eq!(
         app.world_mut()
-            .run_system_once(
-                |mut e: BehaviorEvents<T>, q: Single<BehaviorRef<T>, (With<TA>, With<TB>)>| {
-                    assert!(matches!(
-                        e.read().skip(3).next(),
-                        Some(BehaviorEvent::Error { .. })
-                    ));
-                    (q.previous().copied(), *q.current())
-                }
-            )
+            .run_system_once(|q: Single<BehaviorRef<T>, (With<TA>, With<TB>)>| {
+                (q.previous().copied(), *q.current())
+            })
             .unwrap(),
         (Some(A), B)
     );

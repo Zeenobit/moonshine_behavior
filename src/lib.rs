@@ -9,7 +9,7 @@ pub mod prelude {
         transition, Next, Previous, Reset, Transition, TransitionSequence,
     };
 
-    pub use crate::events::{BehaviorEvent, BehaviorEvents};
+    pub use crate::events::{OnPause, OnResume, OnStart, OnStop};
     pub use crate::plugin::BehaviorPlugin;
 
     pub use crate::match_next;
@@ -28,14 +28,13 @@ use std::ops::{Deref, DerefMut, Index, IndexMut};
 
 use bevy_derive::{Deref, DerefMut};
 use bevy_ecs::change_detection::MaybeLocation;
-use bevy_ecs::component::{Mutable, Tick};
+use bevy_ecs::component::{Components, Mutable, Tick};
 use bevy_ecs::{prelude::*, query::QueryData};
 use bevy_log::prelude::*;
 use bevy_reflect::prelude::*;
-use events::BehaviorEventsMut;
 use moonshine_kind::prelude::*;
 
-use crate::events::BehaviorEvent;
+use crate::events::{OnError, OnPause, OnResume, OnStart, OnStop};
 
 use self::transition::*;
 
@@ -412,8 +411,9 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
     ///
     /// Note that this will fail if the current behavior rejects `next` through [`Behavior::filter_next`].
     /// See [`Error`](crate::events::BehaviorEvent) for details on how to handle transition failures.
+    #[track_caller]
     pub fn start(&mut self, next: T) {
-        self.set_transition(Next(next));
+        self.start_with_caller(next, MaybeLocation::caller());
     }
 
     /// Attempts to start the given `next` behavior if there are no pending transitions and the
@@ -435,13 +435,18 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
     /// pending transition or may expect a transition failure.
     ///
     /// If multiple systems call this method before transition, only the first one will succeed.
+    #[track_caller]
     pub fn try_start(&mut self, next: T) -> Result<(), T> {
         if self.has_transition() || !self.filter_next(&next) {
             return Err(next);
         }
 
-        self.start(next);
+        self.start_with_caller(next, MaybeLocation::caller());
         Ok(())
+    }
+
+    fn start_with_caller(&mut self, next: T, caller: MaybeLocation) {
+        self.set_transition(Next(next), caller);
     }
 
     /// Interrupts the current behavior and starts the given `next` behavior.
@@ -455,17 +460,23 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
     ///
     /// Note that this will fail if the first non-yielding behavior rejects `next` through [`Behavior::filter_next`].
     /// See [`Error`](crate::events::BehaviorEvent) for details on how to handle transition failures.
+    #[track_caller]
     pub fn interrupt_start(&mut self, next: T) {
-        self.set_transition(Interrupt(next));
+        self.interrupt_start_with_caller(next, MaybeLocation::caller());
     }
 
+    #[track_caller]
     pub fn try_interrupt_start(&mut self, next: T) -> Result<(), T> {
         if self.has_transition() {
             return Err(next);
         }
 
-        self.interrupt_start(next);
+        self.interrupt_start_with_caller(next, MaybeLocation::caller());
         Ok(())
+    }
+
+    fn interrupt_start_with_caller(&mut self, next: T, caller: MaybeLocation) {
+        self.set_transition(Interrupt(next), caller);
     }
 
     /// Stops the current behavior.
@@ -474,41 +485,53 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
     ///
     /// Note that this will fail if the current behavior is the initial behavior.
     /// See [`Error`](crate::events::BehaviorEvent) for details on how to handle transition failures.
+    #[track_caller]
     pub fn stop(&mut self) {
-        self.set_transition(Previous);
+        self.stop_with_caller(MaybeLocation::caller());
     }
 
+    #[track_caller]
     pub fn try_stop(&mut self) -> bool {
         if self.has_transition() || self.memory.is_empty() {
             return false;
         }
 
-        self.stop();
+        self.stop_with_caller(MaybeLocation::caller());
         true
+    }
+
+    fn stop_with_caller(&mut self, caller: MaybeLocation) {
+        self.set_transition(Previous, caller);
     }
 
     /// Stops the current and all previous behaviors and resumes the initial behavior.
     ///
     /// This operation clears the stack and resumes the initial behavior. It can never fail.
     /// If the stack is empty (i.e. initial behavior), it does nothing.
+    #[track_caller]
     pub fn reset(&mut self) {
-        self.set_transition(Reset);
+        self.reset_with_caller(MaybeLocation::caller());
     }
 
+    #[track_caller]
     pub fn try_reset(&mut self) -> bool {
         if self.has_transition() {
             return false;
         }
 
-        self.reset();
+        self.reset_with_caller(MaybeLocation::caller());
         true
     }
 
-    fn set_transition(&mut self, transition: Transition<T>) {
+    fn reset_with_caller(&mut self, caller: MaybeLocation) {
+        self.set_transition(Reset, caller);
+    }
+
+    fn set_transition(&mut self, transition: Transition<T>, caller: MaybeLocation) {
         let previous = replace(self.transition.as_mut(), transition);
         if !previous.is_none() {
             warn!(
-                "transition override: {previous:?} -> {:?}",
+                "transition override ({caller})): {previous:?} -> {:?}",
                 *self.transition
             );
         }
@@ -518,9 +541,11 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
         &mut self,
         instance: Instance<T>,
         mut next: T,
-        events: &mut BehaviorEventsMut<T>,
+        components: &Components,
         commands: &mut Commands,
     ) -> bool {
+        let id = components.valid_component_id::<T>().unwrap();
+
         if self.filter_next(&next) {
             let previous = {
                 swap(self.current.as_mut(), &mut next);
@@ -534,24 +559,23 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
                     "{instance:?}: {previous:?} (#{index}) -> {:?} (#{new_index})",
                     *self.current
                 );
+
                 previous.invoke_pause(&self.current, commands.instance(instance));
-                events.write(BehaviorEvent::Pause { instance, index });
-                events.write(BehaviorEvent::Start {
-                    instance,
-                    index: new_index,
-                });
+
+                commands.trigger_targets(OnPause { index }, (*instance, id));
+                commands.trigger_targets(OnStart { index: new_index }, (*instance, id));
+
                 self.memory.push(previous);
             } else {
                 debug!(
                     "{instance:?}: {previous:?} (#{index}) -> {:?} (#{index})",
                     *self.current
                 );
+
                 previous.invoke_stop(&self.current, commands.instance(instance));
-                events.write(BehaviorEvent::Start { instance, index });
-                events.write(BehaviorEvent::Stop {
-                    instance,
-                    behavior: previous,
-                });
+
+                commands.trigger_targets(OnStop { behavior: previous }, (*instance, id));
+                commands.trigger_targets(OnStart { index }, (*instance, id));
             }
             true
         } else {
@@ -559,10 +583,11 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
                 "{instance:?}: transition {:?} -> {next:?} is not allowed",
                 *self.current
             );
-            events.write(BehaviorEvent::Error {
-                instance,
-                error: TransitionError::RejectedNext(next),
-            });
+
+            commands.trigger_targets(
+                OnError(TransitionError::RejectedNext(next)),
+                (*instance, id),
+            );
             false
         }
     }
@@ -571,9 +596,11 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
         &mut self,
         instance: Instance<T>,
         next: T,
-        events: &mut BehaviorEventsMut<T>,
+        components: &Components,
         commands: &mut Commands,
     ) {
+        let id = components.valid_component_id::<T>().unwrap();
+
         while self.filter_yield(&next) && !self.memory.is_empty() {
             let index = self.memory.len();
             if let Some(mut next) = self.memory.pop() {
@@ -587,22 +614,20 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
                     next
                 };
                 previous.invoke_stop(&self.current, commands.instance(instance));
-                events.write(BehaviorEvent::Stop {
-                    instance,
-                    behavior: previous,
-                });
+                commands.trigger_targets(OnStop { behavior: previous }, (*instance, id));
             }
         }
 
-        self.push(instance, next, events, commands);
+        self.push(instance, next, components, commands);
     }
 
     fn pop(
         &mut self,
         instance: Instance<T>,
-        events: &mut BehaviorEventsMut<T>,
+        components: &Components,
         commands: &mut Commands,
     ) -> bool {
+        let id = components.valid_component_id::<T>().unwrap();
         let index = self.memory.len();
         if let Some(mut next) = self.memory.pop() {
             let next_index = self.memory.len();
@@ -616,34 +641,21 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
             };
             self.invoke_resume(&previous, commands.instance(instance));
             previous.invoke_stop(&self.current, commands.instance(instance));
-            events.write(BehaviorEvent::Resume {
-                instance,
-                index: next_index,
-            });
-            events.write(BehaviorEvent::Stop {
-                instance,
-                behavior: previous,
-            });
+            commands.trigger_targets(OnResume { index: next_index }, (*instance, id));
+            commands.trigger_targets(OnStop { behavior: previous }, (*instance, id));
             true
         } else {
             warn!(
                 "{instance:?}: transition {:?} -> None is not allowed",
                 *self.current
             );
-            events.write(BehaviorEvent::Error {
-                instance,
-                error: TransitionError::NoPrevious,
-            });
+            commands.trigger_targets(OnError::<T>(TransitionError::NoPrevious), (*instance, id));
             false
         }
     }
 
-    fn clear(
-        &mut self,
-        instance: Instance<T>,
-        events: &mut BehaviorEventsMut<T>,
-        commands: &mut Commands,
-    ) {
+    fn clear(&mut self, instance: Instance<T>, components: &Components, commands: &mut Commands) {
+        let id = components.valid_component_id::<T>().unwrap();
         while self.memory.len() > 1 {
             let index = self.memory.len();
             let previous = self.memory.pop().unwrap();
@@ -654,13 +666,10 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
                 *self.current
             );
             previous.invoke_stop(next, commands.instance(instance));
-            events.write(BehaviorEvent::Stop {
-                instance,
-                behavior: previous,
-            });
+            commands.trigger_targets(OnStop { behavior: previous }, (*instance, id));
         }
 
-        self.pop(instance, events, commands);
+        self.pop(instance, components, commands);
     }
 }
 
