@@ -1,3 +1,6 @@
+#![doc = include_str!("../README.md")]
+#![warn(missing_docs)]
+
 pub mod prelude {
     pub use crate::{Behavior, BehaviorMut, BehaviorRef};
     pub use moonshine_kind::{Instance, InstanceCommands};
@@ -456,6 +459,15 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
         self.set_transition(Interrupt(next));
     }
 
+    pub fn try_interrupt_start(&mut self, next: T) -> Result<(), T> {
+        if self.has_transition() {
+            return Err(next);
+        }
+
+        self.interrupt_start(next);
+        Ok(())
+    }
+
     /// Stops the current behavior.
     ///
     /// This operation pops the current behavior off the stack and resumes the previous behavior.
@@ -466,12 +478,30 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
         self.set_transition(Previous);
     }
 
+    pub fn try_stop(&mut self) -> bool {
+        if self.has_transition() || self.memory.is_empty() {
+            return false;
+        }
+
+        self.stop();
+        true
+    }
+
     /// Stops the current and all previous behaviors and resumes the initial behavior.
     ///
     /// This operation clears the stack and resumes the initial behavior. It can never fail.
     /// If the stack is empty (i.e. initial behavior), it does nothing.
     pub fn reset(&mut self) {
         self.set_transition(Reset);
+    }
+
+    pub fn try_reset(&mut self) -> bool {
+        if self.has_transition() {
+            return false;
+        }
+
+        self.reset();
+        true
     }
 
     fn set_transition(&mut self, transition: Transition<T>) {
