@@ -58,7 +58,7 @@ pub fn transition<T: Behavior>(
             BehaviorMut<T>,
             Option<&mut TransitionSequence<T>>,
         ),
-        TransitionChanged<T>,
+        Or<(Changed<Transition<T>>, With<TransitionSequence<T>>)>,
     >,
     mut commands: Commands,
 ) {
@@ -112,7 +112,7 @@ pub fn transition<T: Behavior>(
     }
 }
 
-// TODO: Can we use `Changed<TransitionSequence<T>>` for this?
+#[deprecated(since = "0.2.1", note = "use `Changed<Transition<T>>` instead")]
 pub type TransitionChanged<T> = Or<(Changed<Transition<T>>, With<TransitionSequence<T>>)>;
 
 #[derive(Debug, PartialEq, Reflect)]
