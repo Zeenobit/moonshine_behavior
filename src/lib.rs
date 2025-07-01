@@ -160,8 +160,8 @@ impl<T: Behavior> BehaviorRefItem<'_, T> {
     /// The initial behavior always has the index of `0``.
     ///
     /// This index may be used to identify the exact unique behavior state when multiple similar states are in the stack.
-    pub fn index(&self) -> usize {
-        self.memory.len()
+    pub fn index(&self) -> BehaviorIndex {
+        BehaviorIndex(self.memory.len())
     }
 
     /// Returns the previous [`Behavior`] state in the stack.
@@ -290,8 +290,8 @@ impl<T: Behavior> BehaviorMutReadOnlyItem<'_, T> {
     }
 
     /// See [`BehaviorRefItem::index`].
-    pub fn index(&self) -> usize {
-        self.memory.len()
+    pub fn index(&self) -> BehaviorIndex {
+        BehaviorIndex(self.memory.len())
     }
 
     /// See [`BehaviorRefItem::has_transition`].
@@ -391,8 +391,8 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
     }
 
     /// See [`BehaviorRefItem::index`].
-    pub fn index(&self) -> usize {
-        self.memory.len()
+    pub fn index(&self) -> BehaviorIndex {
+        BehaviorIndex(self.memory.len())
     }
 
     /// See [`BehaviorRefItem::has_transition`].
@@ -793,6 +793,14 @@ pub struct BehaviorIndex(usize);
 impl BehaviorIndex {
     pub fn initial() -> Self {
         Self(0)
+    }
+
+    fn next(self) -> Self {
+        Self(self.0.saturating_add(1))
+    }
+
+    fn previous(self) -> Self {
+        Self(self.0.saturating_sub(1))
     }
 }
 

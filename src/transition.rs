@@ -132,7 +132,7 @@ pub enum TransitionError<T: Behavior> {
 #[reflect(Component)]
 pub struct TransitionSequence<T: Behavior> {
     queue: VecDeque<TransitionSequenceElement<T>>,
-    wait_index: Option<usize>,
+    wait_index: Option<BehaviorIndex>,
 }
 
 impl<T: Behavior> TransitionSequence<T> {
@@ -193,7 +193,7 @@ impl<T: Behavior> TransitionSequence<T> {
         mut this: Mut<Self>,
         instance: Instance<T>,
         mut behavior: BehaviorMutItem<T>,
-        stop_index: Option<usize>,
+        stop_index: Option<BehaviorIndex>,
     ) {
         debug_assert!(!this.queue.is_empty());
 
@@ -217,7 +217,7 @@ impl<T: Behavior> TransitionSequence<T> {
                     behavior.start(next);
                 }
                 StartWait(next) => {
-                    this.wait_index = Some(behavior.index() + 1);
+                    this.wait_index = Some(behavior.index().next());
                     behavior.start(next);
                 }
                 Stop => {
