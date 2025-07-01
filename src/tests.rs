@@ -279,7 +279,7 @@ fn sequence() {
 }
 
 #[test]
-fn interrupt() {
+fn interrupt_start() {
     let mut app = app();
     app.world_mut().spawn((A, Next(B)));
     app.update();
@@ -311,7 +311,50 @@ fn interrupt() {
 }
 
 #[test]
-fn interrupt_push() {
+fn interrupt_resume() {
+    let mut app = app();
+    app.world_mut().spawn((A, Next(B)));
+    app.update();
+
+    app.world_mut()
+        .run_system_once(|mut q: Single<BehaviorMut<T>>| {
+            q.start(C);
+        })
+        .unwrap();
+    app.update();
+
+    assert_eq!(
+        app.world_mut()
+            .run_system_once(
+                |q: Single<BehaviorRef<T>, (With<TA>, With<TB>, With<TC>)>| {
+                    (q.previous().copied(), *q.current())
+                }
+            )
+            .unwrap(),
+        (Some(B), C)
+    );
+
+    app.world_mut()
+        .run_system_once(|mut q: Single<BehaviorMut<T>>| {
+            let index = q.index().previous();
+            q.interrupt_resume(index);
+        })
+        .unwrap();
+    app.update();
+    assert_eq!(
+        app.world_mut()
+            .run_system_once(
+                |q: Single<BehaviorRef<T>, (With<TA>, With<TB>, Without<TC>)>| {
+                    (q.previous().copied(), *q.current())
+                }
+            )
+            .unwrap(),
+        (Some(A), B)
+    );
+}
+
+#[test]
+fn interrupt_start_push() {
     let mut app = app();
     app.world_mut().spawn((A, Next(B)));
     app.update();
