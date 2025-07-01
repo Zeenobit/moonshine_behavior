@@ -10,17 +10,16 @@ use moonshine_kind::prelude::*;
 use crate::events::OnStart;
 use crate::{Behavior, BehaviorHooks, BehaviorIndex, BehaviorMut, BehaviorMutItem, Memory};
 
-pub use self::Transition::{Interrupt, Next, Previous, Reset};
+pub use self::Transition::{Interrupt, Next, Previous};
 
-#[derive(Component, Debug, Reflect)]
+#[derive(Component, Clone, Debug, Reflect)]
 #[require(Memory<T>)]
 #[reflect(Component)]
 pub enum Transition<T: Behavior> {
     None,
     Next(T),
-    Interrupt(T),
+    Interrupt(Interruption<T>),
     Previous,
-    Reset,
 }
 
 impl<T: Behavior> Transition<T> {
@@ -36,18 +35,6 @@ impl<T: Behavior> Transition<T> {
 impl<T: Behavior> Default for Transition<T> {
     fn default() -> Self {
         Self::None
-    }
-}
-
-impl<T: Behavior + Clone> Clone for Transition<T> {
-    fn clone(&self) -> Self {
-        match self {
-            Self::None => Self::None,
-            Next(next) => Next(next.clone()),
-            Interrupt(next) => Interrupt(next.clone()),
-            Previous => Previous,
-            Reset => Reset,
-        }
     }
 }
 
@@ -92,12 +79,12 @@ pub fn transition<T: Behavior>(
                 stop_index = Some(behavior.index());
                 interrupt_sequence = !behavior.pop(instance, components, &mut commands);
             }
-            Interrupt(next) => {
+            Interrupt(Interruption::Start(next)) => {
                 behavior.interrupt(instance, next, components, &mut commands);
                 interrupt_sequence = true;
             }
-            Reset => {
-                behavior.clear(instance, components, &mut commands);
+            Interrupt(Interruption::Resume(index)) => {
+                behavior.clear(instance, index, components, &mut commands);
                 interrupt_sequence = true;
             }
             _ => {}
@@ -126,6 +113,12 @@ pub type TransitionChanged<T> = Or<(Changed<Transition<T>>, With<TransitionSeque
 pub enum TransitionError<T: Behavior> {
     RejectedNext(T),
     NoPrevious,
+}
+
+#[derive(Debug, Clone, Reflect)]
+pub enum Interruption<T: Behavior> {
+    Start(T),
+    Resume(BehaviorIndex),
 }
 
 #[derive(Component, Reflect)]

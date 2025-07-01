@@ -6,7 +6,7 @@ pub mod prelude {
     pub use moonshine_kind::{Instance, InstanceCommands};
 
     pub use crate::transition::{
-        transition, Next, Previous, Reset, Transition, TransitionSequence,
+        transition, Interrupt, Interruption, Next, Previous, Transition, TransitionSequence,
     };
 
     pub use crate::events::{OnPause, OnResume, OnStart, OnStop};
@@ -395,6 +395,10 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
         BehaviorIndex(self.memory.len())
     }
 
+    pub fn has_index(&self, index: BehaviorIndex) -> bool {
+        index <= self.index()
+    }
+
     /// See [`BehaviorRefItem::has_transition`].
     pub fn has_transition(&self) -> bool {
         !self.transition.is_none()
@@ -476,7 +480,26 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
     }
 
     fn interrupt_start_with_caller(&mut self, next: T, caller: MaybeLocation) {
-        self.set_transition(Interrupt(next), caller);
+        self.set_transition(Interrupt(Interruption::Start(next)), caller);
+    }
+
+    #[track_caller]
+    pub fn interrupt_resume(&mut self, index: BehaviorIndex) {
+        self.interrupt_resume_with_caller(index, MaybeLocation::caller());
+    }
+
+    #[track_caller]
+    pub fn try_interrupt_resume(&mut self, index: BehaviorIndex) -> Result<(), BehaviorIndex> {
+        if self.has_transition() || !self.has_index(index) {
+            return Err(index);
+        }
+
+        self.interrupt_resume_with_caller(index, MaybeLocation::caller());
+        Ok(())
+    }
+
+    fn interrupt_resume_with_caller(&mut self, index: BehaviorIndex, caller: MaybeLocation) {
+        self.set_transition(Interrupt(Interruption::Resume(index)), caller);
     }
 
     /// Stops the current behavior.
@@ -510,7 +533,7 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
     /// If the stack is empty (i.e. initial behavior), it does nothing.
     #[track_caller]
     pub fn reset(&mut self) {
-        self.reset_with_caller(MaybeLocation::caller());
+        self.interrupt_resume_with_caller(BehaviorIndex::initial(), MaybeLocation::caller());
     }
 
     #[track_caller]
@@ -519,12 +542,8 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
             return false;
         }
 
-        self.reset_with_caller(MaybeLocation::caller());
+        self.interrupt_resume_with_caller(BehaviorIndex::initial(), MaybeLocation::caller());
         true
-    }
-
-    fn reset_with_caller(&mut self, caller: MaybeLocation) {
-        self.set_transition(Reset, caller);
     }
 
     fn set_transition(&mut self, transition: Transition<T>, caller: MaybeLocation) {
@@ -674,9 +693,17 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
         }
     }
 
-    fn clear(&mut self, instance: Instance<T>, components: &Components, commands: &mut Commands) {
+    fn clear(
+        &mut self,
+        instance: Instance<T>,
+        index: BehaviorIndex,
+        components: &Components,
+        commands: &mut Commands,
+    ) {
         let id = components.valid_component_id::<T>().unwrap();
-        while self.memory.len() > 1 {
+
+        // Stop all states except the one above the given index
+        while self.index() > index.next() {
             let index = self.memory.len();
             let previous = self.memory.pop().unwrap();
             let next_index = self.memory.len();
@@ -689,6 +716,7 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
             commands.trigger_targets(OnStop { behavior: previous }, (*instance, id));
         }
 
+        // Pop the state above the given index
         self.pop(instance, components, commands);
     }
 }
@@ -787,7 +815,7 @@ impl<T: Behavior> IndexMut<BehaviorIndex> for BehaviorMutItem<'_, T> {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Reflect)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Reflect)]
 pub struct BehaviorIndex(usize);
 
 impl BehaviorIndex {
