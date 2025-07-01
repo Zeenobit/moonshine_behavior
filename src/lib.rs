@@ -245,10 +245,10 @@ impl<T: Behavior> DetectChanges for BehaviorRefItem<'_, T> {
     }
 }
 
-impl<T: Behavior> Index<usize> for BehaviorRefItem<'_, T> {
+impl<T: Behavior> Index<BehaviorIndex> for BehaviorRefItem<'_, T> {
     type Output = T;
 
-    fn index(&self, index: usize) -> &Self::Output {
+    fn index(&self, BehaviorIndex(index): BehaviorIndex) -> &Self::Output {
         if index == self.memory.stack.len() {
             self.current()
         } else {
@@ -341,10 +341,10 @@ impl<T: Behavior> DetectChanges for BehaviorMutReadOnlyItem<'_, T> {
     }
 }
 
-impl<T: Behavior> Index<usize> for BehaviorMutReadOnlyItem<'_, T> {
+impl<T: Behavior> Index<BehaviorIndex> for BehaviorMutReadOnlyItem<'_, T> {
     type Output = T;
 
-    fn index(&self, index: usize) -> &Self::Output {
+    fn index(&self, BehaviorIndex(index): BehaviorIndex) -> &Self::Output {
         if index == self.memory.stack.len() {
             self.current()
         } else {
@@ -554,16 +554,26 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
             self.invoke_start(Some(&previous), commands.instance(instance));
             let index = self.memory.len();
             if previous.is_resumable() {
-                let new_index = index + 1;
+                let next_index = index + 1;
                 debug!(
-                    "{instance:?}: {previous:?} (#{index}) -> {:?} (#{new_index})",
+                    "{instance:?}: {previous:?} (#{index}) -> {:?} (#{next_index})",
                     *self.current
                 );
 
                 previous.invoke_pause(&self.current, commands.instance(instance));
 
-                commands.trigger_targets(OnPause { index }, (*instance, id));
-                commands.trigger_targets(OnStart { index: new_index }, (*instance, id));
+                commands.trigger_targets(
+                    OnPause {
+                        index: BehaviorIndex(index),
+                    },
+                    (*instance, id),
+                );
+                commands.trigger_targets(
+                    OnStart {
+                        index: BehaviorIndex(next_index),
+                    },
+                    (*instance, id),
+                );
 
                 self.memory.push(previous);
             } else {
@@ -575,7 +585,12 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
                 previous.invoke_stop(&self.current, commands.instance(instance));
 
                 commands.trigger_targets(OnStop { behavior: previous }, (*instance, id));
-                commands.trigger_targets(OnStart { index }, (*instance, id));
+                commands.trigger_targets(
+                    OnStart {
+                        index: BehaviorIndex(index),
+                    },
+                    (*instance, id),
+                );
             }
             true
         } else {
@@ -641,7 +656,12 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
             };
             self.invoke_resume(&previous, commands.instance(instance));
             previous.invoke_stop(&self.current, commands.instance(instance));
-            commands.trigger_targets(OnResume { index: next_index }, (*instance, id));
+            commands.trigger_targets(
+                OnResume {
+                    index: BehaviorIndex(next_index),
+                },
+                (*instance, id),
+            );
             commands.trigger_targets(OnStop { behavior: previous }, (*instance, id));
             true
         } else {
@@ -745,10 +765,10 @@ impl<T: Behavior> AsMut<T> for BehaviorMutItem<'_, T> {
     }
 }
 
-impl<T: Behavior> Index<usize> for BehaviorMutItem<'_, T> {
+impl<T: Behavior> Index<BehaviorIndex> for BehaviorMutItem<'_, T> {
     type Output = T;
 
-    fn index(&self, index: usize) -> &Self::Output {
+    fn index(&self, BehaviorIndex(index): BehaviorIndex) -> &Self::Output {
         if index == self.memory.stack.len() {
             self.current()
         } else {
@@ -757,13 +777,22 @@ impl<T: Behavior> Index<usize> for BehaviorMutItem<'_, T> {
     }
 }
 
-impl<T: Behavior> IndexMut<usize> for BehaviorMutItem<'_, T> {
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+impl<T: Behavior> IndexMut<BehaviorIndex> for BehaviorMutItem<'_, T> {
+    fn index_mut(&mut self, BehaviorIndex(index): BehaviorIndex) -> &mut Self::Output {
         if index == self.memory.stack.len() {
             self.current_mut()
         } else {
             &mut self.memory[index]
         }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Reflect)]
+pub struct BehaviorIndex(usize);
+
+impl BehaviorIndex {
+    pub fn initial() -> Self {
+        Self(0)
     }
 }
 

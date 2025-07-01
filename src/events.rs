@@ -1,21 +1,21 @@
 use bevy_ecs::prelude::*;
 
 use crate::transition::TransitionError;
-use crate::Behavior;
+use crate::{Behavior, BehaviorIndex};
 
 #[derive(Event)]
 pub struct OnStart {
-    pub index: usize,
+    pub index: BehaviorIndex,
 }
 
 #[derive(Event)]
 pub struct OnPause {
-    pub index: usize,
+    pub index: BehaviorIndex,
 }
 
 #[derive(Event)]
 pub struct OnResume {
-    pub index: usize,
+    pub index: BehaviorIndex,
 }
 
 #[derive(Event)]

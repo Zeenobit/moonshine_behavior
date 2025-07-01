@@ -8,7 +8,7 @@ use bevy_reflect::prelude::*;
 use moonshine_kind::prelude::*;
 
 use crate::events::OnStart;
-use crate::{Behavior, BehaviorHooks, BehaviorMut, BehaviorMutItem, Memory};
+use crate::{Behavior, BehaviorHooks, BehaviorIndex, BehaviorMut, BehaviorMutItem, Memory};
 
 pub use self::Transition::{Interrupt, Next, Previous, Reset};
 
@@ -71,7 +71,12 @@ pub fn transition<T: Behavior>(
             // Send start event for the initial behavior
             behavior.invoke_start(None, commands.instance(instance));
             let id = components.valid_component_id::<T>().unwrap();
-            commands.trigger_targets(OnStart { index: 0 }, (*instance, id));
+            commands.trigger_targets(
+                OnStart {
+                    index: BehaviorIndex::initial(),
+                },
+                (*instance, id),
+            );
         }
 
         // Index of the stopped behavior, if applicable.
