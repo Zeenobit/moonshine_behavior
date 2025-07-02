@@ -2,7 +2,7 @@
 #![warn(missing_docs)]
 
 pub mod prelude {
-    pub use crate::{Behavior, BehaviorMut, BehaviorRef};
+    pub use crate::{Behavior, BehaviorIndex, BehaviorMut, BehaviorRef};
     pub use moonshine_kind::{Instance, InstanceCommands};
 
     pub use crate::transition::{
