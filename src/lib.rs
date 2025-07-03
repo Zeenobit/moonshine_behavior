@@ -653,15 +653,11 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
         while self.filter_yield(&next) && !self.memory.is_empty() {
             let index = self.memory.len();
             if let Some(mut next) = self.memory.pop() {
-                let next_index = self.memory.len();
-                debug!(
-                    "{instance:?}: {:?} (#{index}) -> {next:?} (#{next_index})",
-                    *self.current
-                );
                 let previous = {
                     swap(self.current.as_mut(), &mut next);
                     next
                 };
+                debug!("{instance:?}: {:?} (#{index}) -> Interrupt", previous);
                 previous.invoke_stop(&self.current, commands.instance(instance));
                 commands.trigger_targets(OnStop { behavior: previous }, (*instance, id));
             }
@@ -721,12 +717,8 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
         while self.index() > index.next() {
             let index = self.memory.len();
             let previous = self.memory.pop().unwrap();
-            let next_index = self.memory.len();
             let next = self.memory.last().unwrap();
-            debug!(
-                "{instance:?}: {:?} (#{index}) -> {next:?} (#{next_index})",
-                *self.current
-            );
+            debug!("{instance:?}: {:?} (#{index}) -> Interrupt", previous);
             previous.invoke_stop(next, commands.instance(instance));
             commands.trigger_targets(OnStop { behavior: previous }, (*instance, id));
         }
