@@ -19,6 +19,12 @@ pub struct OnResume {
 }
 
 #[derive(Event)]
+pub struct OnActivate {
+    pub index: BehaviorIndex,
+    pub resume: bool,
+}
+
+#[derive(Event)]
 pub struct OnStop<T: Behavior> {
     pub behavior: T,
 }

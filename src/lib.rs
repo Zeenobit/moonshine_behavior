@@ -9,7 +9,7 @@ pub mod prelude {
         transition, Interrupt, Interruption, Next, Previous, Transition, TransitionSequence,
     };
 
-    pub use crate::events::{OnPause, OnResume, OnStart, OnStop};
+    pub use crate::events::{OnActivate, OnPause, OnResume, OnStart, OnStop};
     pub use crate::plugin::BehaviorPlugin;
 
     pub use crate::match_next;
@@ -34,7 +34,7 @@ use bevy_log::prelude::*;
 use bevy_reflect::prelude::*;
 use moonshine_kind::prelude::*;
 
-use crate::events::{OnError, OnPause, OnResume, OnStart, OnStop};
+use crate::events::{OnActivate, OnError, OnPause, OnResume, OnStart, OnStop};
 
 use self::transition::*;
 
@@ -608,6 +608,13 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
                     },
                     (*instance, id),
                 );
+                commands.trigger_targets(
+                    OnActivate {
+                        index: BehaviorIndex(next_index),
+                        resume: false,
+                    },
+                    (*instance, id),
+                );
 
                 self.memory.push(previous);
             } else {
@@ -622,6 +629,13 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
                 commands.trigger_targets(
                     OnStart {
                         index: BehaviorIndex(index),
+                    },
+                    (*instance, id),
+                );
+                commands.trigger_targets(
+                    OnActivate {
+                        index: BehaviorIndex(index),
+                        resume: false,
                     },
                     (*instance, id),
                 );
@@ -689,6 +703,13 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
             commands.trigger_targets(
                 OnResume {
                     index: BehaviorIndex(next_index),
+                },
+                (*instance, id),
+            );
+            commands.trigger_targets(
+                OnActivate {
+                    index: BehaviorIndex(next_index),
+                    resume: true,
                 },
                 (*instance, id),
             );
