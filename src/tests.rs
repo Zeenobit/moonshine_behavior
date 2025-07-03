@@ -354,6 +354,49 @@ fn interrupt_resume() {
 }
 
 #[test]
+fn interrupt_stop() {
+    let mut app = app();
+    app.world_mut().spawn((A, Next(B)));
+    app.update();
+
+    app.world_mut()
+        .run_system_once(|mut q: Single<BehaviorMut<T>>| {
+            q.start(C);
+        })
+        .unwrap();
+    app.update();
+
+    assert_eq!(
+        app.world_mut()
+            .run_system_once(
+                |q: Single<BehaviorRef<T>, (With<TA>, With<TB>, With<TC>)>| {
+                    (q.previous().copied(), *q.current())
+                }
+            )
+            .unwrap(),
+        (Some(B), C)
+    );
+
+    app.world_mut()
+        .run_system_once(|mut q: Single<BehaviorMut<T>>| {
+            let index = q.index().previous();
+            q.interrupt_stop(index);
+        })
+        .unwrap();
+    app.update();
+    assert_eq!(
+        app.world_mut()
+            .run_system_once(
+                |q: Single<BehaviorRef<T>, (With<TA>, Without<TB>, Without<TC>)>| {
+                    (q.previous().copied(), *q.current())
+                }
+            )
+            .unwrap(),
+        (None, A)
+    );
+}
+
+#[test]
 fn interrupt_start_push() {
     let mut app = app();
     app.world_mut().spawn((A, Next(B)));

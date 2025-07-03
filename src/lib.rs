@@ -484,6 +484,21 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
     }
 
     #[track_caller]
+    pub fn interrupt_stop(&mut self, index: BehaviorIndex) {
+        self.interrupt_resume_with_caller(index.previous(), MaybeLocation::caller());
+    }
+
+    #[track_caller]
+    pub fn try_interrupt_stop(&mut self, index: BehaviorIndex) -> Result<(), BehaviorIndex> {
+        if self.has_transition() || !self.has_index(index) {
+            return Err(index);
+        }
+
+        self.interrupt_resume_with_caller(index.previous(), MaybeLocation::caller());
+        Ok(())
+    }
+
+    #[track_caller]
     pub fn interrupt_resume(&mut self, index: BehaviorIndex) {
         self.interrupt_resume_with_caller(index, MaybeLocation::caller());
     }
