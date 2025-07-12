@@ -1,6 +1,7 @@
 #![doc = include_str!("../README.md")]
 #![warn(missing_docs)]
 
+/// Common elements for [`Behavior`] query and management.
 pub mod prelude {
     pub use crate::{Behavior, BehaviorIndex, BehaviorMut, BehaviorRef};
     pub use moonshine_kind::{Instance, InstanceCommands};
@@ -16,8 +17,9 @@ pub mod prelude {
 }
 
 pub mod events;
-pub mod plugin;
 pub mod transition;
+
+mod plugin;
 
 #[cfg(test)]
 mod tests;
@@ -34,10 +36,18 @@ use bevy_log::prelude::*;
 use bevy_reflect::prelude::*;
 use moonshine_kind::prelude::*;
 
+pub use plugin::BehaviorPlugin;
+
 use crate::events::{OnActivate, OnError, OnPause, OnResume, OnStart, OnStop};
 
 use self::transition::*;
 
+/// Any [`Component`] which may be used as a [`Behavior`].
+///
+/// # Usage
+///
+/// A [`Behavior`] is a component which represents a set of finite states. This makes `enum` the ideal data structure
+/// to implement this trait, however this is not a strict requirement.
 pub trait Behavior: Component<Mutability = Mutable> + Debug + Sized {
     /// Called when an interrupt is requested.
     ///

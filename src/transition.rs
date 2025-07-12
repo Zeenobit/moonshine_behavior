@@ -1,3 +1,7 @@
+//! A [`Behavior`] is controlled using [`Transition`].
+//!
+//! Transitions are processed by the [`transition`] system.
+
 use std::collections::VecDeque;
 use std::fmt::Debug;
 
