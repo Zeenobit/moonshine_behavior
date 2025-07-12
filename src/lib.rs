@@ -150,18 +150,14 @@ impl<T: Behavior> BehaviorRefItem<'_, T> {
         &self.current
     }
 
-    /// Returns the index associated with the current [`Behavior`] state.
-    ///
-    /// # Usage
-    ///
-    /// Each behavior state is associated with an index which corresponds to their position in the stack.
-    ///
-    /// The current behavior is always at the top of the stack.
-    /// The initial behavior always has the index of `0``.
-    ///
-    /// This index may be used to identify the exact unique behavior state when multiple similar states are in the stack.
+    /// Returns the [`BehaviorIndex`] associated with the current [`Behavior`] state.
     pub fn index(&self) -> BehaviorIndex {
         BehaviorIndex(self.memory.len())
+    }
+
+    /// Returns `true` if the given [`BehaviorIndex`] matches a state in this [`Behavior`] stack.
+    pub fn has_index(&self, index: BehaviorIndex) -> bool {
+        index <= self.index()
     }
 
     /// Returns the previous [`Behavior`] state in the stack.
@@ -395,6 +391,7 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
         BehaviorIndex(self.memory.len())
     }
 
+    /// See [`BehaviorRefItem::has_index`].
     pub fn has_index(&self, index: BehaviorIndex) -> bool {
         index <= self.index()
     }
@@ -469,6 +466,9 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
         self.interrupt_start_with_caller(next, MaybeLocation::caller());
     }
 
+    /// Attempts to interrupt the current behavior and start the given `next` behavior.
+    ///
+    /// This is similar to [`interrupt_start`](BehaviorMutItem::interrupt_start) but will fail if there is a pending transition.
     #[track_caller]
     pub fn try_interrupt_start(&mut self, next: T) -> Result<(), T> {
         if self.has_transition() {
@@ -483,14 +483,25 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
         self.set_transition(Interrupt(Interruption::Start(next)), caller);
     }
 
+    /// Stops all behaviors above and including the given [`BehaviorIndex`].
+    ///
+    /// This also removes any remaining [`TransitionSequence`] steps.
+    ///
+    /// The initial behavior is never allowed to yield.
     #[track_caller]
     pub fn interrupt_stop(&mut self, index: BehaviorIndex) {
         self.interrupt_resume_with_caller(index.previous(), MaybeLocation::caller());
     }
 
+    /// Attempts to stop all behaviors above and including the given [`BehaviorIndex`].
+    ///
+    /// This is similar to [`interrupt_stop`](BehaviorMutItem::interrupt_stop) but will fail if:
+    /// - There is a pending transition
+    /// - The given `index` is the initial behavior
+    /// - The given `index` is not in the stack
     #[track_caller]
     pub fn try_interrupt_stop(&mut self, index: BehaviorIndex) -> Result<(), BehaviorIndex> {
-        if self.has_transition() || !self.has_index(index) {
+        if self.has_transition() || !self.has_index(index) || index == BehaviorIndex::initial() {
             return Err(index);
         }
 
@@ -498,11 +509,19 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
         Ok(())
     }
 
+    /// Stops all behaviors above the given [`BehaviorIndex`] and resume the behavior at that index.
+    ///
+    /// This also removes any remaining [`TransitionSequence`] steps.
     #[track_caller]
     pub fn interrupt_resume(&mut self, index: BehaviorIndex) {
         self.interrupt_resume_with_caller(index, MaybeLocation::caller());
     }
 
+    /// Attempts to stop all behaviors above the given [`BehaviorIndex`] and resume the behavior at that index.
+    ///
+    /// This is similar to [`interrupt_resume`](BehaviorMutItem::interrupt_resume) but will fail if:
+    /// - There is a pending transition
+    /// - The given `index` is not in the stack
     #[track_caller]
     pub fn try_interrupt_resume(&mut self, index: BehaviorIndex) -> Result<(), BehaviorIndex> {
         if self.has_transition() || !self.has_index(index) {
@@ -528,6 +547,11 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
         self.stop_with_caller(MaybeLocation::caller());
     }
 
+    /// Attempts to stop the current behavior.
+    ///
+    /// This is similar to [`stop`](BehaviorMutItem::stop) but will fail if:
+    /// - There is a pending transition
+    /// - The current behavior is the initial behavior
     #[track_caller]
     pub fn try_stop(&mut self) -> bool {
         if self.has_transition() || self.memory.is_empty() {
@@ -551,6 +575,9 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
         self.interrupt_resume_with_caller(BehaviorIndex::initial(), MaybeLocation::caller());
     }
 
+    /// Attempts to reset the current behavior.
+    ///
+    /// This is similar to [`reset`](BehaviorMutItem::reset) but will fail if there is a pending transition.
     #[track_caller]
     pub fn try_reset(&mut self) -> bool {
         if self.has_transition() {
@@ -843,10 +870,15 @@ impl<T: Behavior> IndexMut<BehaviorIndex> for BehaviorMutItem<'_, T> {
     }
 }
 
+/// A numeric index which represents the position of a [`Behavior`] in the stack.
+///
+/// This index may be used to uniquely identify each behavior state.
+/// The initial behavior always has the index of `0`, and the current behavior always has the highest index (length of the stack).
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Reflect)]
 pub struct BehaviorIndex(usize);
 
 impl BehaviorIndex {
+    /// Returns the index of the initial behavior. This is always `0`.
     pub fn initial() -> Self {
         Self(0)
     }
