@@ -12,17 +12,26 @@ use crate::{Behavior, BehaviorHooks, BehaviorIndex, BehaviorMut, BehaviorMutItem
 
 pub use self::Transition::{Interrupt, Next, Previous};
 
+/// A [`Component`] which controls transitions between [`Behavior`] states.
+///
+/// This component is automatically registered as a required component for all types
+/// which implement the [`Behavior`] trait and and have their [`BehaviorPlugin`](crate::plugin::BehaviorPlugin) added.
 #[derive(Component, Clone, Debug, Reflect)]
 #[require(Memory<T>)]
 #[reflect(Component)]
 pub enum Transition<T: Behavior> {
+    #[doc(hidden)]
     None,
+    /// Starts the next behavior.
     Next(T),
+    /// Starts an [`Interruption`].
     Interrupt(Interruption<T>),
+    /// Stops the current behavior and resumes the previous one.
     Previous,
 }
 
 impl<T: Behavior> Transition<T> {
+    /// Returns `true` if there are no pending transitions.
     pub fn is_none(&self) -> bool {
         matches!(self, Self::None)
     }
@@ -38,8 +47,9 @@ impl<T: Behavior> Default for Transition<T> {
     }
 }
 
+/// A system which processes [`Behavior`] [`Transitions`](Transition).
 pub fn transition<T: Behavior>(
-    mut components: &Components,
+    components: &Components,
     mut query: Query<
         (
             Instance<T>,
@@ -106,21 +116,30 @@ pub fn transition<T: Behavior>(
     }
 }
 
-#[deprecated(since = "0.2.1", note = "use `Changed<Transition<T>>` instead")]
-pub type TransitionChanged<T> = Or<(Changed<Transition<T>>, With<TransitionSequence<T>>)>;
-
-#[derive(Debug, PartialEq, Reflect)]
-pub enum TransitionError<T: Behavior> {
-    RejectedNext(T),
-    NoPrevious,
-}
-
+/// A specific kind of [`Transition`] which may stop active behaviors before activating a new one.
 #[derive(Debug, Clone, Reflect)]
 pub enum Interruption<T: Behavior> {
+    /// An interruption which stops any behavior which [yields](Behavior::filter_yield)
+    /// to the given behavior, and then starts it.
     Start(T),
+    /// An interruption which resumes a behavior at the given index by stopping all other behaviors above it in the stack.
     Resume(BehaviorIndex),
 }
 
+#[doc(hidden)]
+#[deprecated(since = "0.2.1", note = "use `Changed<Transition<T>>` instead")]
+pub type TransitionChanged<T> = Or<(Changed<Transition<T>>, With<TransitionSequence<T>>)>;
+
+/// Represents an error during [`transition`].
+#[derive(Debug, PartialEq, Reflect)]
+pub enum TransitionError<T: Behavior> {
+    /// The given behavior was rejected by [`filter_next`](Behavior::filter_next).
+    RejectedNext(T),
+    /// Initial behavior may not be stopped.
+    NoPrevious,
+}
+
+/// A queue of transitions to start automated behavior sequences.
 #[derive(Component, Reflect)]
 #[reflect(Component)]
 pub struct TransitionSequence<T: Behavior> {
@@ -129,6 +148,7 @@ pub struct TransitionSequence<T: Behavior> {
 }
 
 impl<T: Behavior> TransitionSequence<T> {
+    /// Creates a new transition sequence which starts all the given behaviors in given order.
     pub fn new(items: impl IntoIterator<Item = T>) -> Self {
         Self {
             queue: VecDeque::from_iter(items.into_iter().map(TransitionSequenceElement::Start)),
@@ -136,6 +156,7 @@ impl<T: Behavior> TransitionSequence<T> {
         }
     }
 
+    /// Creates an empty transition sequence.
     pub fn empty() -> Self {
         Self {
             queue: VecDeque::new(),
@@ -143,34 +164,41 @@ impl<T: Behavior> TransitionSequence<T> {
         }
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.queue.is_empty()
-    }
-
-    pub fn len(&self) -> usize {
-        self.queue.len()
-    }
-
+    /// Creates a new transition sequence which starts with the given behavior.
     pub fn start(next: T) -> Self {
         let mut sequence = Self::empty();
         sequence.push(TransitionSequenceElement::Start(next));
         sequence
     }
 
+    /// Creates a new transition sequence which starts with the given behavior and waits for it to finish.
     pub fn wait_for(next: T) -> Self {
         Self::empty().then_wait_for(next)
     }
 
+    /// Returns `true` if the sequence is empty.
+    pub fn is_empty(&self) -> bool {
+        self.queue.is_empty()
+    }
+
+    /// Returns the number of transitions in the sequence.
+    pub fn len(&self) -> usize {
+        self.queue.len()
+    }
+
+    /// Starts the next behavior in the sequence.
     pub fn then(mut self, next: T) -> Self {
         self.push(TransitionSequenceElement::Start(next));
         self
     }
 
+    /// Starts the next behavior in the sequence and waits for it to finish.
     pub fn then_wait_for(mut self, next: T) -> Self {
         self.push(TransitionSequenceElement::StartWait(next));
         self
     }
 
+    /// Stops the current behavior.
     pub fn then_stop(mut self) -> Self {
         self.push(TransitionSequenceElement::Stop);
         self
