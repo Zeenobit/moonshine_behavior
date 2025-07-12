@@ -30,68 +30,34 @@ When a behavior stops, the previous state is removed from the stack and inserted
 ### Setup
 
 #### 1. Define your behavior data as a [`Component`](https://docs.rs/bevy/latest/bevy/ecs/component/trait.Component.html)
+
+Behaviors are often implemented as an `enum` since they are ideal for representing finite state machines. However, this is not a strict requirement. Any `struct` may also be used to represent behavior states.
+
 ```rust
 use bevy::prelude::*;
 
-#[derive(Component, Default, Debug, Reflect)]
+#[derive(Component, Debug, Reflect)]
 #[reflect(Component)]
 enum Bird {
-    #[default]
-    Idle,
-    Fly,
-    Sleep,
-    Chirp,
-}
-```
-
-Behaviors are often implemented as an `enum` since they represent a finite set of states. This is not a hard requirement. Any `struct` may be used to represent behavior data as well, such as:
-```rust
-# use bevy::prelude::*;
-#[derive(Component, Default, Debug, Reflect)]
-#[reflect(Component)]
-struct Bird {
-    flying: bool,
-    sleeping: bool,
-    chirping: bool,
-}
-```
-
-You may even use nested enums or structs to represent complex state machines:
-```rust
-use bevy::prelude::*;
-
-#[derive(Component, Default, Debug, Reflect)]
-#[reflect(Component)]
-enum Bird {
-    #[default]
-    Idle,
-    Fly(Fly),
-    Sleep(Sleep),
-    Chirp(Chirp),
-}
-
-#[derive(Default, Debug, Reflect)]
-enum Fly {
-    #[default]
-    Normal,
-    Hunt,
-    Flee,
-}
-
-#[derive(Default, Debug, Reflect)]
-struct Sleep {
-    duration: f32,
-}
-
-#[derive(Default, Debug, Reflect)]
-struct Chirp {
-    count: usize,
+    /* ... */
 }
 ```
 
 #### 2. Implement the [`Behavior`] trait:
 
-```rust,ignore
+```rust
+use bevy::prelude::*;
+use moonshine_behavior::prelude::*;
+
+#[derive(Component, Debug, Reflect)]
+#[reflect(Component)]
+enum Bird {
+    Idle,
+    Fly,
+    Sleep,
+    Chirp,
+}
+
 impl Behavior for Bird {
     fn filter_next(&self, next: &Self) -> bool {
         use Bird::*;
@@ -115,7 +81,20 @@ This trait has additional methods for more advanced usage. See [`Behavior`] trai
 
 #### 3. Register the `Behavior` and its transition:
 Add a [`BehaviorPlugin`] and the [`transition`] system to your [`App`] to trigger behavior transitions whenever you want.
-```rust,ignore
+```rust
+use bevy::prelude::*;
+use moonshine_behavior::prelude::*;
+
+#[derive(Component, Debug, Reflect)]
+#[reflect(Component)]
+enum Bird {
+    /* ... */
+}
+
+impl Behavior for Bird {
+    /* ... */
+}
+
 app.add_plugins(BehaviorPlugin::<Bird>::default())
     .add_systems(Update, transition::<Bird>);
 ```
@@ -126,7 +105,7 @@ Usually, systems that cause behavior change should run before transition while s
   
 #### 4. Spawn
 
-The first instance of `T` which is inserted into the entity is considered the **Initial Behavior**:
+The first instance of `T` which is inserted into the entity is defined as the **Initial Behavior**:
 ```rust,ignore
 fn spawn_bird(mut commands: Commands) {
     commands.spawn(Bird::Idle); // <--- Bird starts in Idle state
@@ -146,10 +125,8 @@ Or maybe even a [`TransitionSequence`]:
 fn spawn_bird(mut commands: Commands) {
     commands.spawn((
         Bird::Idle,
-        TransitionSequence::new()
-            .then_wait_for(Bird::Chirp)
-            .then(Bird::Fly)
-        ));
+        TransitionSequence::wait_for(Bird::Chirp).then(Bird::Fly)
+    ));
 }
 ```
 
@@ -178,6 +155,10 @@ fn update_bird(mut query: Query<BehaviorMut<Bird>>) {
 
 `BehaviorMut<T>` extends `BehaviorRef<T>` and allows you to modify the behavior as well.
 
+Note that you may also access your behavior as `&T` or `&mut T` directly (it is just a component after all!).
+
+`Transition<T>` is also directly accessible as a component, however it is more ergonomic to use `BehaviorMut<T>` for transitions.
+
 ### Transitions
 
 When a transition is requested, it is not invoked immediately. Instead, it is invoked whenever the registered [`transition`] system is run.
@@ -193,8 +174,9 @@ You may register your systems before or after `transition::<T>` to perform any l
 To invoke a transition, you may use the [`BehaviorMut<T>`]. There are several methods for invoking transitions:
 
 - [`start`] Pauses the current behavior and starts a new one.
-- [`try_start`] Attempts to start a new behavior if there is currently no pending transition and the current behavior allows it.
 - [`interrupt_start`] Stops all behaviors which [yield][`filter_yield`] to the new behavior, and then starts the new behavior.
+- [`interrupt_resume`] Stops all behaviors above a given index in the stack and resumes it.
+- [`interrupt_stop`] Stops all behaviors above and including given index in the stack, resuming the previous one.
 - [`stop`] Stops the current behavior and resumes the previous one.
 - [`reset`] Stops all behaviors and resets the entity to its initial state.
 
@@ -252,10 +234,11 @@ You may also contact me on the official [Bevy Discord](https://discord.gg/bevy) 
 [`BehaviorEvent`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/struct.BehaviorEvent.html
 [`BehaviorRef<T>`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/struct.BehaviorRef.html
 [`BehaviorMut<T>`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/struct.BehaviorMut.html
-[`start`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/struct.BehaviorMut.html#method.start
-[`try_start`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/struct.BehaviorMut.html#method.try_start
-[`interrupt_start`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/struct.BehaviorMut.html#method.interrupt_start
-[`stop`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/struct.BehaviorMut.html#method.stop
-[`reset`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/struct.BehaviorMut.html#method.reset
+[`start`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/struct.BehaviorMutItem.html#method.start
+[`interrupt_start`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/struct.BehaviorMutItem.html#method.interrupt_start
+[`interrupt_resume`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/struct.BehaviorMutItem.html#method.interrupt_resume
+[`interrupt_stop`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/struct.BehaviorMutItem.html#method.interrupt_stop
+[`stop`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/struct.BehaviorMutItem.html#method.stop
+[`reset`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/struct.BehaviorMutItem.html#method.reset
 [`filter_yield`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/trait.Behavior.html#method.filter_yield
 [`filter_next`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/trait.Behavior.html#method.filter_next
