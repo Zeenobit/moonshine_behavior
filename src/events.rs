@@ -1,6 +1,7 @@
 //! Each [`Behavior`] [`Transition`](crate::transition::Transition) triggers an [`Event`].
 //!
 //! You may use these events to react to transitions and define the behavior logic.
+//! Most events contain a [`BehaviorIndex`] which may be used to query the current state of the behavior.
 //!
 //! See documentation for each event for more details.
 //!
@@ -15,8 +16,32 @@
 //!
 //! impl Behavior for B {}
 //!
-//! fn b_start(trigger: Trigger<OnStart, B>, query: Query<BehaviorRef<B>>) {
+//! fn on_start(trigger: Trigger<OnStart, B>, query: Query<BehaviorRef<B>>) {
 //!     let behavior = query.get(target.target()).unwrap();
+//!     let state = behavior[trigger.index];
+//!     /* ... */
+//! }
+//!
+//! fn on_pause(trigger: Trigger<OnPause, B>, query: Query<BehaviorRef<B>>) {
+//!     let behavior = query.get(target.target()).unwrap();
+//!     let state = behavior[trigger.index];
+//!     /* ... */
+//! }
+//!
+//! fn on_resume(trigger: Trigger<OnResume, B>, query: Query<BehaviorRef<B>>) {
+//!     let behavior = query.get(target.target()).unwrap();
+//!     let state = behavior[trigger.index];
+//!     /* ... */
+//! }
+//!
+//! fn on_activate(trigger: Trigger<OnActivate, B>, query: Query<BehaviorRef<B>>) {
+//!     let behavior = query.get(target.target()).unwrap();
+//!     let state = behavior[trigger.index];
+//!     /* ... */
+//! }
+//!
+//! fn on_stop(trigger: Trigger<OnStop<B>, B>) {
+//!     let state = trigger.behavior;
 //!     /* ... */
 //! }
 //! ```
@@ -48,6 +73,7 @@ pub struct OnResume {
 }
 
 /// An event which is triggered when a [`Behavior`] is started OR resumed.
+///
 #[derive(Event)]
 pub struct OnActivate {
     /// The index of the behavior that was activated.
@@ -56,10 +82,14 @@ pub struct OnActivate {
     pub resume: bool,
 }
 
+// TODO: OnSuspend, This gets tricky because the behavior state is already gone in `OnStop` ...
+
 /// An event which is triggered when a [`Behavior`] is stopped.
+///
+/// Unlike other events, this one does not provide a behavior index.
 #[derive(Event)]
 pub struct OnStop<T: Behavior> {
-    /// The index of the behavior that was stopped.
+    /// The behavior that was stopped.
     pub behavior: T,
 }
 
