@@ -11,7 +11,7 @@ use bevy_log::prelude::*;
 use bevy_reflect::prelude::*;
 use moonshine_kind::prelude::*;
 
-use crate::events::OnStart;
+use crate::events::{OnActivate, OnStart};
 use crate::{Behavior, BehaviorHooks, BehaviorIndex, BehaviorMut, BehaviorMutItem, Memory};
 
 pub use self::Transition::{Interrupt, Next, Previous};
@@ -75,6 +75,13 @@ pub fn transition<T: Behavior>(
             commands.trigger_targets(
                 OnStart {
                     index: BehaviorIndex::initial(),
+                },
+                (*instance, id),
+            );
+            commands.trigger_targets(
+                OnActivate {
+                    index: BehaviorIndex::initial(),
+                    resume: false,
                 },
                 (*instance, id),
             );
