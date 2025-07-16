@@ -1,6 +1,6 @@
 [package]
 name = "moonshine-behavior"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2021"
 license = "MIT"
 description = "Minimalistic state machine for Bevy game engine."
@@ -13,7 +13,7 @@ bevy_ecs = "0.16.*"
 bevy_reflect = "0.16.*"
 bevy_log = "0.16.*"
 bevy_derive = "0.16.*"
-moonshine-kind = { version = "0.2.*" }
+moonshine-kind = { version = "0.3.*" }
 
 [dev-dependencies]
 bevy = "0.16.*"
