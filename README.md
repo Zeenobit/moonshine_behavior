@@ -95,6 +95,7 @@ impl Behavior for Bird {
     /* ... */
 }
 
+let mut app = App::new();
 app.add_plugins(BehaviorPlugin::<Bird>::default())
     .add_systems(Update, transition::<Bird>);
 ```

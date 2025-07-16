@@ -24,7 +24,7 @@ use crate::{Behavior, Memory, Transition, TransitionSequence};
 /// fn main() {
 ///     App::new()
 ///         /* ... */
-///         .add_plugin(BehaviorPlugin::<B>::default())
+///         .add_plugins(BehaviorPlugin::<B>::default())
 ///         .add_systems(Update, transition::<B>)
 ///         /* ... */;
 /// }
