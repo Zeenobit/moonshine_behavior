@@ -224,6 +224,16 @@ These hook commands would be executed immediately after [`transition`] is invoke
 
 See [signal.rs](examples/signal.rs) for a complete example.
 
+### Version 0.3
+
+- Add `try_*` functions to `BehaviorMut<T>` to automatically check for transition overrides
+- Refactor `BehaviorEvents` into separate events to work better with new Bevy triggers
+    - An `OnActivate` event is also added
+- Add `BehaviorIndex` for safer behavior index management
+- Add `interrupt_stop` and `interrupt_resume` transition methods
+    - The old "Reset" transition is implemented as an `interrupt_resume` to initial behavior
+
+
 ## Support
 
 Please [post an issue](https://github.com/Zeenobit/moonshine_behavior/issues/new) for any bugs, questions, or suggestions.
