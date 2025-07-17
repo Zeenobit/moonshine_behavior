@@ -189,6 +189,17 @@ impl<T: Behavior> BehaviorRefItem<'_, T> {
         self.memory.iter().chain(std::iter::once(self.current()))
     }
 
+    /// Returns an iterator over all ([`BehaviorIndex`], [`Behavior`]) pairs in the stack, including the current one.
+    ///
+    /// The iterator is ordered from the initial behavior (index = 0) to the current one.
+    pub fn enumerate(&self) -> impl Iterator<Item = (BehaviorIndex, &T)> + '_ {
+        self.memory
+            .iter()
+            .enumerate()
+            .map(|(index, item)| (BehaviorIndex(index), item))
+            .chain(std::iter::once((self.index(), self.current())))
+    }
+
     /// Returns `true` if there is any pending [`Transition`] for this [`Behavior`].
     ///
     /// # Usage
@@ -295,6 +306,15 @@ impl<T: Behavior> BehaviorMutReadOnlyItem<'_, T> {
         self.memory.iter().chain(std::iter::once(self.current()))
     }
 
+    /// See [`BehaviorRefItem::enumerate`].
+    pub fn enumerate(&self) -> impl Iterator<Item = (BehaviorIndex, &T)> + '_ {
+        self.memory
+            .iter()
+            .enumerate()
+            .map(|(index, item)| (BehaviorIndex(index), item))
+            .chain(std::iter::once((self.index(), self.current())))
+    }
+
     /// See [`BehaviorRefItem::index`].
     pub fn index(&self) -> BehaviorIndex {
         BehaviorIndex(self.memory.len())
@@ -394,6 +414,27 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
         self.memory
             .iter_mut()
             .chain(std::iter::once(self.current.as_mut()))
+    }
+
+    /// See [`BehaviorRefItem::enumerate`].
+    pub fn enumerate(&self) -> impl Iterator<Item = (BehaviorIndex, &T)> + '_ {
+        self.memory
+            .iter()
+            .enumerate()
+            .map(|(index, item)| (BehaviorIndex(index), item))
+            .chain(std::iter::once((self.index(), self.current())))
+    }
+
+    /// Returns a mutable iterator over all ([`BehaviorIndex`], [`Behavior`]) pairs in the stack, including the current one.
+    ///
+    /// See [`BehaviorRefItem::enumerate`] for more details.
+    pub fn enumerate_mut(&mut self) -> impl Iterator<Item = (BehaviorIndex, &mut T)> + '_ {
+        let current_index = self.index();
+        self.memory
+            .iter_mut()
+            .enumerate()
+            .map(|(index, item)| (BehaviorIndex(index), item))
+            .chain(std::iter::once((current_index, self.current.as_mut())))
     }
 
     /// See [`BehaviorRefItem::index`].

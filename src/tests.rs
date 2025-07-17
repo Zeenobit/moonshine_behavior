@@ -86,6 +86,25 @@ fn initial() {
 }
 
 #[test]
+fn initial_load() {
+    let mut app = app();
+    app.world_mut().spawn((
+        C,
+        // Simulate loading from saved data:
+        crate::Memory {
+            stack: [A, B].into(),
+        },
+    ));
+    app.update();
+    assert_eq!(
+        app.world_mut()
+            .run_system_once(|q: Single<BehaviorRef<T>, (With<TA>, With<TB>, With<TC>)>| { **q })
+            .unwrap(),
+        C
+    );
+}
+
+#[test]
 fn push() {
     let mut app = app();
     app.world_mut().spawn((A, Next(B)));

@@ -64,27 +64,34 @@ pub fn transition<T: Behavior>(
     >,
     mut commands: Commands,
 ) {
+    let id = components.valid_component_id::<T>().unwrap();
+
     for (instance, mut behavior, sequence_opt) in &mut query {
         if behavior.current.is_added() {
-            // Memory must be empty when the component is added
-            debug_assert!(behavior.memory.is_empty());
-
-            // Send start event for the initial behavior
-            behavior.invoke_start(None, commands.instance(instance));
-            let id = components.valid_component_id::<T>().unwrap();
-            commands.trigger_targets(
-                OnStart {
-                    index: BehaviorIndex::initial(),
-                },
-                (*instance, id),
-            );
+            let index = BehaviorIndex::initial();
+            behavior[index].invoke_start(None, commands.instance(instance));
+            commands.trigger_targets(OnStart { index }, (*instance, id));
             commands.trigger_targets(
                 OnActivate {
-                    index: BehaviorIndex::initial(),
+                    index,
                     resume: false,
                 },
                 (*instance, id),
             );
+
+            for (index, current) in behavior.enumerate().skip(1) {
+                let previous = &behavior[index.previous()];
+                previous.invoke_pause(current, commands.instance(instance));
+                behavior[index].invoke_start(Some(previous), commands.instance(instance));
+                commands.trigger_targets(OnStart { index }, (*instance, id));
+                commands.trigger_targets(
+                    OnActivate {
+                        index,
+                        resume: false,
+                    },
+                    (*instance, id),
+                );
+            }
         }
 
         // Index of the stopped behavior, if applicable.
