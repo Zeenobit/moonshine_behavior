@@ -70,11 +70,18 @@ pub fn transition<T: Behavior>(
         if behavior.current.is_added() {
             let index = BehaviorIndex::initial();
             behavior[index].invoke_start(None, commands.instance(instance));
-            commands.trigger_targets(OnStart { index }, (*instance, id));
+            commands.trigger_targets(
+                OnStart {
+                    index,
+                    initialize: true,
+                },
+                (*instance, id),
+            );
             commands.trigger_targets(
                 OnActivate {
                     index,
                     resume: false,
+                    initialize: true,
                 },
                 (*instance, id),
             );
@@ -83,11 +90,18 @@ pub fn transition<T: Behavior>(
                 let previous = &behavior[index.previous()];
                 previous.invoke_pause(current, commands.instance(instance));
                 behavior[index].invoke_start(Some(previous), commands.instance(instance));
-                commands.trigger_targets(OnStart { index }, (*instance, id));
+                commands.trigger_targets(
+                    OnStart {
+                        index,
+                        initialize: true,
+                    },
+                    (*instance, id),
+                );
                 commands.trigger_targets(
                     OnActivate {
                         index,
                         resume: false,
+                        initialize: true,
                     },
                     (*instance, id),
                 );
