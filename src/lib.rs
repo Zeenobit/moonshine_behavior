@@ -541,7 +541,7 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
     /// The initial behavior is never allowed to yield.
     #[track_caller]
     pub fn interrupt_stop(&mut self, index: BehaviorIndex) {
-        self.interrupt_resume_with_caller(index.previous(), MaybeLocation::caller());
+        self.interrupt_resume_with_caller(index.previous().unwrap(), MaybeLocation::caller());
     }
 
     /// Attempts to stop all behaviors above and including the given [`BehaviorIndex`].
@@ -552,11 +552,15 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
     /// - The given `index` is not in the stack
     #[track_caller]
     pub fn try_interrupt_stop(&mut self, index: BehaviorIndex) -> Result<(), BehaviorIndex> {
-        if self.has_transition() || !self.has_index(index) || index == BehaviorIndex::initial() {
+        if self.has_transition() || !self.has_index(index) {
             return Err(index);
         }
 
-        self.interrupt_resume_with_caller(index.previous(), MaybeLocation::caller());
+        let Some(previous_index) = index.previous() else {
+            return Err(index);
+        };
+
+        self.interrupt_resume_with_caller(previous_index, MaybeLocation::caller());
         Ok(())
     }
 
@@ -943,8 +947,12 @@ impl BehaviorIndex {
         Self(self.0.saturating_add(1))
     }
 
-    fn previous(self) -> Self {
-        Self(self.0.saturating_sub(1))
+    fn previous(self) -> Option<Self> {
+        if self == BehaviorIndex::initial() {
+            return None;
+        }
+
+        Some(Self(self.0.saturating_sub(1)))
     }
 }
 

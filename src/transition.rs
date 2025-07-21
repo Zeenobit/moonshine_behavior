@@ -68,28 +68,14 @@ pub fn transition<T: Behavior>(
 
     for (instance, mut behavior, sequence_opt) in &mut query {
         if behavior.current.is_added() {
-            let index = BehaviorIndex::initial();
-            behavior[index].invoke_start(None, commands.instance(instance));
-            commands.trigger_targets(
-                OnStart {
-                    index,
-                    initialize: true,
-                },
-                (*instance, id),
-            );
-            commands.trigger_targets(
-                OnActivate {
-                    index,
-                    resume: false,
-                    initialize: true,
-                },
-                (*instance, id),
-            );
-
-            for (index, current) in behavior.enumerate().skip(1) {
-                let previous = &behavior[index.previous()];
-                previous.invoke_pause(current, commands.instance(instance));
-                behavior[index].invoke_start(Some(previous), commands.instance(instance));
+            for (index, current) in behavior.enumerate() {
+                if let Some(previous_index) = index.previous() {
+                    let previous = &behavior[previous_index];
+                    previous.invoke_pause(current, commands.instance(instance));
+                    behavior[index].invoke_start(Some(previous), commands.instance(instance));
+                } else {
+                    behavior[index].invoke_start(None, commands.instance(instance));
+                }
                 commands.trigger_targets(
                     OnStart {
                         index,
