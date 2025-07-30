@@ -581,7 +581,7 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
     #[track_caller]
     pub fn force_interrupt_stop(&mut self, index: BehaviorIndex) {
         let previous_index = index.previous().unwrap();
-        self.interrupt_resume_with_caller(previous_index, MaybeLocation::caller(), false);
+        self.interrupt_resume_with_caller(previous_index, MaybeLocation::caller(), true);
     }
 
     /// Stops all behaviors above the given [`BehaviorIndex`] and resume the behavior at that index.
