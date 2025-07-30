@@ -786,6 +786,7 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
             };
             self.invoke_resume(&previous, commands.instance(instance));
             previous.invoke_stop(&self.current, commands.instance(instance));
+            commands.trigger_targets(OnStop { behavior: previous }, (*instance, id));
             commands.trigger_targets(
                 OnResume {
                     index: BehaviorIndex(next_index),
@@ -800,7 +801,6 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
                 },
                 (*instance, id),
             );
-            commands.trigger_targets(OnStop { behavior: previous }, (*instance, id));
             true
         } else {
             warn!(
