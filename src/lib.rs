@@ -465,7 +465,7 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
     /// See [`Error`](crate::events::BehaviorEvent) for details on how to handle transition failures.
     #[track_caller]
     pub fn start(&mut self, next: T) {
-        self.start_with_caller(next, MaybeLocation::caller());
+        self.start_with_caller(next, MaybeLocation::caller(), false);
     }
 
     /// Attempts to start the given `next` behavior if there are no pending transitions and the
@@ -493,12 +493,17 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
             return Err(next);
         }
 
-        self.start_with_caller(next, MaybeLocation::caller());
+        self.start_with_caller(next, MaybeLocation::caller(), false);
         Ok(())
     }
 
-    fn start_with_caller(&mut self, next: T, caller: MaybeLocation) {
-        self.set_transition(Next(next), caller);
+    #[track_caller]
+    pub fn force_start(&mut self, next: T) {
+        self.start_with_caller(next, MaybeLocation::caller(), true);
+    }
+
+    fn start_with_caller(&mut self, next: T, caller: MaybeLocation, force: bool) {
+        self.set_transition(Next(next), caller, force);
     }
 
     /// Interrupts the current behavior and starts the given `next` behavior.
@@ -514,7 +519,7 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
     /// See [`Error`](crate::events::BehaviorEvent) for details on how to handle transition failures.
     #[track_caller]
     pub fn interrupt_start(&mut self, next: T) {
-        self.interrupt_start_with_caller(next, MaybeLocation::caller());
+        self.interrupt_start_with_caller(next, MaybeLocation::caller(), false);
     }
 
     /// Attempts to interrupt the current behavior and start the given `next` behavior.
@@ -526,12 +531,17 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
             return Err(next);
         }
 
-        self.interrupt_start_with_caller(next, MaybeLocation::caller());
+        self.interrupt_start_with_caller(next, MaybeLocation::caller(), false);
         Ok(())
     }
 
-    fn interrupt_start_with_caller(&mut self, next: T, caller: MaybeLocation) {
-        self.set_transition(Interrupt(Interruption::Start(next)), caller);
+    #[track_caller]
+    pub fn force_interrupt_start(&mut self, next: T) {
+        self.interrupt_start_with_caller(next, MaybeLocation::caller(), true);
+    }
+
+    fn interrupt_start_with_caller(&mut self, next: T, caller: MaybeLocation, force: bool) {
+        self.set_transition(Interrupt(Interruption::Start(next)), caller, force);
     }
 
     /// Stops all behaviors above and including the given [`BehaviorIndex`].
@@ -541,7 +551,11 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
     /// The initial behavior is never allowed to yield.
     #[track_caller]
     pub fn interrupt_stop(&mut self, index: BehaviorIndex) {
-        self.interrupt_resume_with_caller(index.previous().unwrap(), MaybeLocation::caller());
+        self.interrupt_resume_with_caller(
+            index.previous().unwrap(),
+            MaybeLocation::caller(),
+            false,
+        );
     }
 
     /// Attempts to stop all behaviors above and including the given [`BehaviorIndex`].
@@ -560,8 +574,14 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
             return Err(index);
         };
 
-        self.interrupt_resume_with_caller(previous_index, MaybeLocation::caller());
+        self.interrupt_resume_with_caller(previous_index, MaybeLocation::caller(), false);
         Ok(())
+    }
+
+    #[track_caller]
+    pub fn force_interrupt_stop(&mut self, index: BehaviorIndex) {
+        let previous_index = index.previous().unwrap();
+        self.interrupt_resume_with_caller(previous_index, MaybeLocation::caller(), false);
     }
 
     /// Stops all behaviors above the given [`BehaviorIndex`] and resume the behavior at that index.
@@ -569,7 +589,7 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
     /// This also removes any remaining [`TransitionSequence`] steps.
     #[track_caller]
     pub fn interrupt_resume(&mut self, index: BehaviorIndex) {
-        self.interrupt_resume_with_caller(index, MaybeLocation::caller());
+        self.interrupt_resume_with_caller(index, MaybeLocation::caller(), false);
     }
 
     /// Attempts to stop all behaviors above the given [`BehaviorIndex`] and resume the behavior at that index.
@@ -583,12 +603,22 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
             return Err(index);
         }
 
-        self.interrupt_resume_with_caller(index, MaybeLocation::caller());
+        self.interrupt_resume_with_caller(index, MaybeLocation::caller(), false);
         Ok(())
     }
 
-    fn interrupt_resume_with_caller(&mut self, index: BehaviorIndex, caller: MaybeLocation) {
-        self.set_transition(Interrupt(Interruption::Resume(index)), caller);
+    #[track_caller]
+    pub fn force_interrupt_resume(&mut self, index: BehaviorIndex) {
+        self.interrupt_resume_with_caller(index, MaybeLocation::caller(), true);
+    }
+
+    fn interrupt_resume_with_caller(
+        &mut self,
+        index: BehaviorIndex,
+        caller: MaybeLocation,
+        force: bool,
+    ) {
+        self.set_transition(Interrupt(Interruption::Resume(index)), caller, force);
     }
 
     /// Stops the current behavior.
@@ -599,7 +629,7 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
     /// See [`Error`](crate::events::BehaviorEvent) for details on how to handle transition failures.
     #[track_caller]
     pub fn stop(&mut self) {
-        self.stop_with_caller(MaybeLocation::caller());
+        self.stop_with_caller(MaybeLocation::caller(), false);
     }
 
     /// Attempts to stop the current behavior.
@@ -613,12 +643,17 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
             return false;
         }
 
-        self.stop_with_caller(MaybeLocation::caller());
+        self.stop_with_caller(MaybeLocation::caller(), false);
         true
     }
 
-    fn stop_with_caller(&mut self, caller: MaybeLocation) {
-        self.set_transition(Previous, caller);
+    #[track_caller]
+    pub fn force_stop(&mut self) {
+        self.stop_with_caller(MaybeLocation::caller(), true);
+    }
+
+    fn stop_with_caller(&mut self, caller: MaybeLocation, force: bool) {
+        self.set_transition(Previous, caller, force);
     }
 
     /// Stops the current and all previous behaviors and resumes the initial behavior.
@@ -627,7 +662,7 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
     /// If the stack is empty (i.e. initial behavior), it does nothing.
     #[track_caller]
     pub fn reset(&mut self) {
-        self.interrupt_resume_with_caller(BehaviorIndex::initial(), MaybeLocation::caller());
+        self.interrupt_resume_with_caller(BehaviorIndex::initial(), MaybeLocation::caller(), false);
     }
 
     /// Attempts to reset the current behavior.
@@ -639,13 +674,18 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
             return false;
         }
 
-        self.interrupt_resume_with_caller(BehaviorIndex::initial(), MaybeLocation::caller());
+        self.interrupt_resume_with_caller(BehaviorIndex::initial(), MaybeLocation::caller(), false);
         true
     }
 
-    fn set_transition(&mut self, transition: Transition<T>, caller: MaybeLocation) {
+    #[track_caller]
+    pub fn force_reset(&mut self) {
+        self.interrupt_resume_with_caller(BehaviorIndex::initial(), MaybeLocation::caller(), true);
+    }
+
+    fn set_transition(&mut self, transition: Transition<T>, caller: MaybeLocation, force: bool) {
         let previous = replace(self.transition.as_mut(), transition);
-        if !previous.is_none() {
+        if !force && !previous.is_none() {
             warn!(
                 "transition override ({caller})): {previous:?} -> {:?}",
                 *self.transition
