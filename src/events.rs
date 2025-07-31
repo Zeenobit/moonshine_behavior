@@ -102,8 +102,12 @@ pub struct OnActivate {
 /// Unlike other events, this one does not provide a behavior index.
 #[derive(Event)]
 pub struct OnStop<T: Behavior> {
+    /// The index of the behavior that was stopped.
+    pub index: BehaviorIndex,
     /// The behavior that was stopped.
     pub behavior: T,
+    /// If true, it indicates the behavior was stopped because it was interrupted.
+    pub interrupt: bool,
 }
 
 /// An event which is triggered when a [`TransitionError`] occurs.

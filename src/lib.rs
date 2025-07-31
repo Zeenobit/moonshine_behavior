@@ -749,7 +749,14 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
 
                 previous.invoke_stop(&self.current, commands.instance(instance));
 
-                commands.trigger_targets(OnStop { behavior: previous }, (*instance, id));
+                commands.trigger_targets(
+                    OnStop {
+                        index: BehaviorIndex(index),
+                        behavior: previous,
+                        interrupt: false,
+                    },
+                    (*instance, id),
+                );
                 commands.trigger_targets(
                     OnStart {
                         index: BehaviorIndex(index),
@@ -799,7 +806,14 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
                 };
                 debug!("{instance:?}: {:?} (#{index}) -> Interrupt", previous);
                 previous.invoke_stop(&self.current, commands.instance(instance));
-                commands.trigger_targets(OnStop { behavior: previous }, (*instance, id));
+                commands.trigger_targets(
+                    OnStop {
+                        index: BehaviorIndex(index),
+                        behavior: previous,
+                        interrupt: true,
+                    },
+                    (*instance, id),
+                );
             }
         }
 
@@ -826,7 +840,14 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
             };
             self.invoke_resume(&previous, commands.instance(instance));
             previous.invoke_stop(&self.current, commands.instance(instance));
-            commands.trigger_targets(OnStop { behavior: previous }, (*instance, id));
+            commands.trigger_targets(
+                OnStop {
+                    index: BehaviorIndex(index),
+                    behavior: previous,
+                    interrupt: false,
+                },
+                (*instance, id),
+            );
             commands.trigger_targets(
                 OnResume {
                     index: BehaviorIndex(next_index),
@@ -868,7 +889,14 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
             let next = self.memory.last().unwrap();
             debug!("{instance:?}: {:?} (#{index}) -> Interrupt", previous);
             previous.invoke_stop(next, commands.instance(instance));
-            commands.trigger_targets(OnStop { behavior: previous }, (*instance, id));
+            commands.trigger_targets(
+                OnStop {
+                    index: BehaviorIndex(index),
+                    behavior: previous,
+                    interrupt: true,
+                },
+                (*instance, id),
+            );
         }
 
         // Pop the state above the given index
@@ -983,16 +1011,17 @@ impl BehaviorIndex {
         Self(0)
     }
 
-    fn next(self) -> Self {
-        Self(self.0.saturating_add(1))
-    }
-
-    fn previous(self) -> Option<Self> {
+    /// Returns the index of the behavior before this one, if exists.
+    pub fn previous(self) -> Option<Self> {
         if self == BehaviorIndex::initial() {
             return None;
         }
 
         Some(Self(self.0.saturating_sub(1)))
+    }
+
+    fn next(self) -> Self {
+        Self(self.0.saturating_add(1))
     }
 }
 
