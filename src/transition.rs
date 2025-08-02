@@ -12,7 +12,9 @@ use bevy_reflect::prelude::*;
 use moonshine_kind::prelude::*;
 
 use crate::events::{OnActivate, OnStart};
-use crate::{Behavior, BehaviorHooks, BehaviorIndex, BehaviorMut, BehaviorMutItem, Memory};
+use crate::{
+    Behavior, BehaviorHooks, BehaviorIndex, BehaviorItem, BehaviorMut, BehaviorMutItem, Memory,
+};
 
 pub use self::Transition::{Interrupt, Next, Previous};
 
@@ -104,7 +106,7 @@ pub fn transition<T: Behavior>(
                 interrupt_sequence = !behavior.push(instance, next, components, &mut commands);
             }
             Previous => {
-                stop_index = Some(behavior.index());
+                stop_index = Some(behavior.current_index());
                 interrupt_sequence = !behavior.pop(instance, components, &mut commands);
             }
             Interrupt(Interruption::Start(next)) => {
@@ -256,7 +258,7 @@ impl<T: Behavior> TransitionSequence<T> {
                     behavior.start(next);
                 }
                 StartWait(next) => {
-                    this.wait_index = Some(behavior.index().next());
+                    this.wait_index = Some(behavior.current_index().next());
                     behavior.start(next);
                 }
                 Stop => {

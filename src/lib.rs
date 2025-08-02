@@ -3,7 +3,7 @@
 
 /// Common elements for [`Behavior`] query and management.
 pub mod prelude {
-    pub use crate::{Behavior, BehaviorIndex, BehaviorMut, BehaviorRef};
+    pub use crate::{Behavior, BehaviorIndex, BehaviorItem, BehaviorMut, BehaviorRef};
     pub use moonshine_kind::{Instance, InstanceCommands};
 
     pub use crate::transition::{
@@ -125,6 +125,74 @@ trait BehaviorHooks: Behavior {
 
 impl<T: Behavior> BehaviorHooks for T {}
 
+pub trait BehaviorItem {
+    type Behavior: Behavior;
+
+    /// Returns the current [`Behavior`] state.
+    fn current(&self) -> &Self::Behavior;
+
+    /// Returns the previous [`Behavior`] state in the stack.
+    ///
+    /// # Usage
+    ///
+    /// Note that this is **NOT** the previously active state.
+    /// Instead, this is the previous state which was active before the current one was started.
+    ///
+    /// To access the previously active state, handle [`Stop`](crate::events::BehaviorEvent::Stop) instead.
+    fn previous(&self) -> Option<&Self::Behavior>;
+
+    /// Returns the [`BehaviorIndex`] associated with the current [`Behavior`] state.
+    #[deprecated(since = "0.3.1", note = "use `current_index` instead")]
+    fn index(&self) -> BehaviorIndex {
+        self.current_index()
+    }
+
+    fn current_index(&self) -> BehaviorIndex;
+
+    fn find_index(&self, mut p: impl FnMut(&Self::Behavior) -> bool) -> Option<BehaviorIndex> {
+        self.enumerate()
+            .find_map(|(index, behavior)| p(behavior).then_some(index))
+    }
+
+    /// Returns `true` if the given [`BehaviorIndex`] matches a state in this [`Behavior`] stack.
+    fn has_index(&self, index: BehaviorIndex) -> bool {
+        index <= self.current_index()
+    }
+
+    /// Returns an iterator over all ([`BehaviorIndex`], [`Behavior`]) pairs in the stack, including the current one.
+    ///
+    /// The iterator is ordered from the initial behavior (index = 0) to the current one.
+    fn enumerate(&self) -> impl Iterator<Item = (BehaviorIndex, &Self::Behavior)> + '_;
+
+    /// Returns an iterator over all [`Behavior`] states in the stack, including the current one.
+    ///
+    /// The iterator is ordered from the initial behavior (index = 0) to the current one.
+    fn iter(&self) -> impl Iterator<Item = &Self::Behavior> + '_ {
+        self.enumerate().map(|(_, behavior)| behavior)
+    }
+
+    /// Returns `true` if there is any pending [`Transition`] for this [`Behavior`].
+    ///
+    /// # Usage
+    ///
+    /// By design, only one transition is allowed per [`transition`](crate::transition::transition) cycle.
+    ///
+    /// The only exception to this rule is if the behavior is interrupted or reset where multiple states
+    /// may be stopped within a single cycle.
+    ///
+    /// If a transition is requested while another is pending, it would be overriden.
+    /// The transition helper methods [`start`](BehaviorMutItem::start), [`interrupt_start`](BehaviorMutItem::interrupt_start),
+    /// [`stop`](BehaviorMutItem::stop) and [`reset`](BehaviorMutItem::reset) all trigger a warning in this case.
+    ///
+    /// Because of this, this method is useful to avoid unintentional transition overrides.
+    fn has_transition(&self) -> bool;
+
+    /// Returns `true` if there is any [`TransitionSequence`] running on this [`Behavior`].
+    ///
+    /// This is useful to allow transition sequences to finish before starting a new behavior.
+    fn has_sequence(&self) -> bool;
+}
+
 /// Query data for a [`Behavior`].
 ///
 /// # Usage
@@ -154,74 +222,34 @@ impl<T: Behavior> BehaviorRef<T> {
     }
 }
 
-impl<T: Behavior> BehaviorRefItem<'_, T> {
-    /// Returns the current [`Behavior`] state.
-    pub fn current(&self) -> &T {
+impl<T: Behavior> BehaviorItem for BehaviorRefItem<'_, T> {
+    type Behavior = T;
+
+    fn current(&self) -> &T {
         &self.current
     }
 
-    /// Returns the [`BehaviorIndex`] associated with the current [`Behavior`] state.
-    pub fn index(&self) -> BehaviorIndex {
+    fn current_index(&self) -> BehaviorIndex {
         BehaviorIndex(self.memory.len())
     }
 
-    /// Returns `true` if the given [`BehaviorIndex`] matches a state in this [`Behavior`] stack.
-    pub fn has_index(&self, index: BehaviorIndex) -> bool {
-        index <= self.index()
-    }
-
-    /// Returns the previous [`Behavior`] state in the stack.
-    ///
-    /// # Usage
-    ///
-    /// Note that this is **NOT** the previously active state.
-    /// Instead, this is the previous state which was active before the current one was started.
-    ///
-    /// To access the previously active state, handle [`Stop`](crate::events::BehaviorEvent::Stop) instead.
-    pub fn previous(&self) -> Option<&T> {
+    fn previous(&self) -> Option<&T> {
         self.memory.last()
     }
 
-    /// Returns an iterator over all [`Behavior`] states in the stack, including the current one.
-    ///
-    /// The iterator is ordered from the initial behavior (index = 0) to the current one.
-    pub fn iter(&self) -> impl Iterator<Item = &T> + '_ {
-        self.memory.iter().chain(std::iter::once(self.current()))
-    }
-
-    /// Returns an iterator over all ([`BehaviorIndex`], [`Behavior`]) pairs in the stack, including the current one.
-    ///
-    /// The iterator is ordered from the initial behavior (index = 0) to the current one.
-    pub fn enumerate(&self) -> impl Iterator<Item = (BehaviorIndex, &T)> + '_ {
+    fn enumerate(&self) -> impl Iterator<Item = (BehaviorIndex, &T)> + '_ {
         self.memory
             .iter()
             .enumerate()
             .map(|(index, item)| (BehaviorIndex(index), item))
-            .chain(std::iter::once((self.index(), self.current())))
+            .chain(std::iter::once((self.current_index(), self.current())))
     }
 
-    /// Returns `true` if there is any pending [`Transition`] for this [`Behavior`].
-    ///
-    /// # Usage
-    ///
-    /// By design, only one transition is allowed per [`transition`](crate::transition::transition) cycle.
-    ///
-    /// The only exception to this rule is if the behavior is interrupted or reset where multiple states
-    /// may be stopped within a single cycle.
-    ///
-    /// If a transition is requested while another is pending, it would be overriden.
-    /// The transition helper methods [`start`](BehaviorMutItem::start), [`interrupt_start`](BehaviorMutItem::interrupt_start),
-    /// [`stop`](BehaviorMutItem::stop) and [`reset`](BehaviorMutItem::reset) all trigger a warning in this case.
-    ///
-    /// Because of this, this method is useful to avoid unintentional transition overrides.
-    pub fn has_transition(&self) -> bool {
+    fn has_transition(&self) -> bool {
         !self.transition.is_none()
     }
 
-    /// Returns `true` if there is any [`TransitionSequence`] running on this [`Behavior`].
-    ///
-    /// This is useful to allow transition sequences to finish before starting a new behavior.
-    pub fn has_sequence(&self) -> bool {
+    fn has_sequence(&self) -> bool {
         self.sequence
     }
 }
@@ -290,43 +318,34 @@ pub struct BehaviorMut<T: Behavior> {
     sequence: Has<TransitionSequence<T>>,
 }
 
-impl<T: Behavior> BehaviorMutReadOnlyItem<'_, T> {
-    /// See [`BehaviorRefItem::current`].
-    pub fn current(&self) -> &T {
+impl<T: Behavior> BehaviorItem for BehaviorMutReadOnlyItem<'_, T> {
+    type Behavior = T;
+
+    fn current(&self) -> &T {
         &self.current
     }
 
-    /// See [`BehaviorRefItem::previous`].
-    pub fn previous(&self) -> Option<&T> {
+    fn current_index(&self) -> BehaviorIndex {
+        BehaviorIndex(self.memory.len())
+    }
+
+    fn previous(&self) -> Option<&T> {
         self.memory.last()
     }
 
-    /// See [`BehaviorRefItem::iter`].
-    pub fn iter(&self) -> impl Iterator<Item = &T> + '_ {
-        self.memory.iter().chain(std::iter::once(self.current()))
-    }
-
-    /// See [`BehaviorRefItem::enumerate`].
-    pub fn enumerate(&self) -> impl Iterator<Item = (BehaviorIndex, &T)> + '_ {
+    fn enumerate(&self) -> impl Iterator<Item = (BehaviorIndex, &T)> + '_ {
         self.memory
             .iter()
             .enumerate()
             .map(|(index, item)| (BehaviorIndex(index), item))
-            .chain(std::iter::once((self.index(), self.current())))
+            .chain(std::iter::once((self.current_index(), self.current())))
     }
 
-    /// See [`BehaviorRefItem::index`].
-    pub fn index(&self) -> BehaviorIndex {
-        BehaviorIndex(self.memory.len())
-    }
-
-    /// See [`BehaviorRefItem::has_transition`].
-    pub fn has_transition(&self) -> bool {
+    fn has_transition(&self) -> bool {
         !self.transition.is_none()
     }
 
-    /// See [`BehaviorRefItem::has_sequence`].
-    pub fn has_sequence(&self) -> bool {
+    fn has_sequence(&self) -> bool {
         self.sequence
     }
 }
@@ -379,20 +398,44 @@ impl<T: Behavior> Index<BehaviorIndex> for BehaviorMutReadOnlyItem<'_, T> {
     }
 }
 
-impl<T: Behavior> BehaviorMutItem<'_, T> {
-    /// Returns the current [`Behavior`] state.
-    pub fn current(&self) -> &T {
+impl<T: Behavior> BehaviorItem for BehaviorMutItem<'_, T> {
+    type Behavior = T;
+
+    fn current(&self) -> &T {
         &self.current
     }
+
+    fn current_index(&self) -> BehaviorIndex {
+        BehaviorIndex(self.memory.len())
+    }
+
+    fn previous(&self) -> Option<&T> {
+        self.memory.last()
+    }
+
+    fn enumerate(&self) -> impl Iterator<Item = (BehaviorIndex, &Self::Behavior)> + '_ {
+        self.memory
+            .iter()
+            .enumerate()
+            .map(|(index, item)| (BehaviorIndex(index), item))
+            .chain(std::iter::once((self.current_index(), self.current())))
+    }
+
+    fn has_transition(&self) -> bool {
+        !self.transition.is_none()
+    }
+
+    fn has_sequence(&self) -> bool {
+        self.sequence
+    }
+}
+
+impl<T: Behavior> BehaviorMutItem<'_, T> {
+    /// Returns the current [`Behavior`] state.
 
     /// Returns the current [`Behavior`] state as a mutable.
     pub fn current_mut(&mut self) -> &mut T {
         self.current.as_mut()
-    }
-
-    /// See [`BehaviorRefItem::previous`].
-    pub fn previous(&self) -> Option<&T> {
-        self.memory.last()
     }
 
     /// Returns the previous [`Behavior`] state as a mutable.
@@ -400,11 +443,6 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
     /// See [`BehaviorRefItem::previous`] for more details.
     pub fn previous_mut(&mut self) -> Option<&mut T> {
         self.memory.last_mut()
-    }
-
-    /// See [`BehaviorRefItem::iter`].
-    pub fn iter(&self) -> impl Iterator<Item = &T> + '_ {
-        self.memory.iter().chain(std::iter::once(self.current()))
     }
 
     /// Returns a mutable iterator over all [`Behavior`] states in the stack, including the current one.
@@ -416,45 +454,16 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
             .chain(std::iter::once(self.current.as_mut()))
     }
 
-    /// See [`BehaviorRefItem::enumerate`].
-    pub fn enumerate(&self) -> impl Iterator<Item = (BehaviorIndex, &T)> + '_ {
-        self.memory
-            .iter()
-            .enumerate()
-            .map(|(index, item)| (BehaviorIndex(index), item))
-            .chain(std::iter::once((self.index(), self.current())))
-    }
-
     /// Returns a mutable iterator over all ([`BehaviorIndex`], [`Behavior`]) pairs in the stack, including the current one.
     ///
     /// See [`BehaviorRefItem::enumerate`] for more details.
     pub fn enumerate_mut(&mut self) -> impl Iterator<Item = (BehaviorIndex, &mut T)> + '_ {
-        let current_index = self.index();
+        let current_index = self.current_index();
         self.memory
             .iter_mut()
             .enumerate()
             .map(|(index, item)| (BehaviorIndex(index), item))
             .chain(std::iter::once((current_index, self.current.as_mut())))
-    }
-
-    /// See [`BehaviorRefItem::index`].
-    pub fn index(&self) -> BehaviorIndex {
-        BehaviorIndex(self.memory.len())
-    }
-
-    /// See [`BehaviorRefItem::has_index`].
-    pub fn has_index(&self, index: BehaviorIndex) -> bool {
-        index <= self.index()
-    }
-
-    /// See [`BehaviorRefItem::has_transition`].
-    pub fn has_transition(&self) -> bool {
-        !self.transition.is_none()
-    }
-
-    /// See [`BehaviorRefItem::has_sequence`].
-    pub fn has_sequence(&self) -> bool {
-        self.sequence
     }
 
     /// Starts the given `next` behavior.
@@ -883,7 +892,7 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
         let id = components.valid_component_id::<T>().unwrap();
 
         // Stop all states except the one above the given index
-        while self.index() > index.next() {
+        while self.current_index() > index.next() {
             let index = self.memory.len();
             let previous = self.memory.pop().unwrap();
             let next = self.memory.last().unwrap();

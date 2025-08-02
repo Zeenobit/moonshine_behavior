@@ -355,7 +355,7 @@ fn interrupt_resume() {
 
     app.world_mut()
         .run_system_once(|mut q: Single<BehaviorMut<T>>| {
-            let index = q.index().previous().unwrap();
+            let index = q.current_index().previous().unwrap();
             q.interrupt_resume(index);
         })
         .unwrap();
@@ -398,7 +398,7 @@ fn interrupt_stop() {
 
     app.world_mut()
         .run_system_once(|mut q: Single<BehaviorMut<T>>| {
-            let index = q.index().previous().unwrap();
+            let index = q.current_index().previous().unwrap();
             q.interrupt_stop(index);
         })
         .unwrap();
