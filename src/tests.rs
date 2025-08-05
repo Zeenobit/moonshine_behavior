@@ -179,11 +179,11 @@ fn pop_initial() {
 }
 
 #[test]
-fn sequence() {
+fn queue() {
     let mut app = app();
     app.world_mut().spawn((
         A,
-        TransitionSequence::start(B) // A -> B
+        TransitionQueue::start(B) // A -> B
             .then(C) // B -> C
             .then_wait_for(D) // C -> D -> C
             .then_stop() //  C -> B
@@ -279,7 +279,7 @@ fn sequence() {
         (Some(A), D)
     );
 
-    // Sequence should be done, check again to be sure:
+    // Queue should be done, check again to be sure:
     app.update();
     assert_eq!(
         app.world_mut()
@@ -293,7 +293,142 @@ fn sequence() {
     );
     assert!(app
         .world_mut()
-        .run_system_once(|q: Query<&TransitionSequence<T>>| { q.single().is_err() })
+        .run_system_once(|q: Query<&TransitionQueue<T>>| { q.single().is_err() })
+        .unwrap());
+}
+
+#[test]
+fn chain() {
+    let mut app = app();
+
+    // A -> B -> C -> D
+    app.world_mut()
+        .spawn((A, TransitionQueue::chain([B, C, D])));
+
+    app.update(); // A
+    assert_eq!(
+        app.world_mut()
+            .run_system_once(|q: Single<BehaviorRef<T>, With<TA>>| {
+                (q.previous().copied(), *q.current())
+            })
+            .unwrap(),
+        (None, A)
+    );
+
+    app.update(); // A -> B
+    assert_eq!(
+        app.world_mut()
+            .run_system_once(|q: Single<BehaviorRef<T>, (With<TA>, With<TB>)>| {
+                (q.previous().copied(), *q.current())
+            })
+            .unwrap(),
+        (Some(A), B)
+    );
+
+    app.update(); // A -> B -> C
+    assert_eq!(
+        app.world_mut()
+            .run_system_once(
+                |q: Single<BehaviorRef<T>, (With<TA>, With<TB>, With<TC>)>| {
+                    (q.previous().copied(), *q.current())
+                }
+            )
+            .unwrap(),
+        (Some(B), C)
+    );
+
+    app.update(); // A -> B -> C -> D
+    assert_eq!(
+        app.world_mut()
+            .run_system_once(
+                |q: Single<BehaviorRef<T>, (With<TA>, With<TB>, With<TC>, With<TD>)>| {
+                    (q.previous().copied(), *q.current())
+                }
+            )
+            .unwrap(),
+        (Some(C), D)
+    );
+
+    // Queue should be done, check again to be sure:
+    app.update();
+    assert_eq!(
+        app.world_mut()
+            .run_system_once(
+                |q: Single<BehaviorRef<T>, (With<TA>, With<TB>, With<TC>, With<TD>)>| {
+                    (q.previous().copied(), *q.current())
+                }
+            )
+            .unwrap(),
+        (Some(C), D)
+    );
+    assert!(app
+        .world_mut()
+        .run_system_once(|q: Query<&TransitionQueue<T>>| { q.single().is_err() })
+        .unwrap());
+}
+
+#[test]
+fn sequence() {
+    let mut app = app();
+
+    // A -> B, A -> D
+    app.world_mut()
+        .spawn((A, TransitionQueue::sequence([B, D])));
+
+    app.update(); // A
+    assert_eq!(
+        app.world_mut()
+            .run_system_once(|q: Single<BehaviorMut<T>, With<TA>>| {
+                (q.previous().copied(), *q.current())
+            })
+            .unwrap(),
+        (None, A)
+    );
+
+    app.update(); // A -> B
+    assert_eq!(
+        app.world_mut()
+            .run_system_once(|mut q: Single<BehaviorMut<T>, (With<TA>, With<TB>)>| {
+                q.stop();
+                (q.previous().copied(), *q.current())
+            })
+            .unwrap(),
+        (Some(A), B)
+    );
+
+    app.update(); // A
+    assert_eq!(
+        app.world_mut()
+            .run_system_once(|q: Single<BehaviorRef<T>, With<TA>>| {
+                (q.previous().copied(), *q.current())
+            })
+            .unwrap(),
+        (None, A)
+    );
+
+    app.update(); // A -> D
+    assert_eq!(
+        app.world_mut()
+            .run_system_once(|q: Single<BehaviorRef<T>, (With<TA>, With<TD>)>| {
+                (q.previous().copied(), *q.current())
+            })
+            .unwrap(),
+        (Some(A), D)
+    );
+
+    // Queue should be done, check again to be sure:
+    app.update();
+    assert_eq!(
+        app.world_mut()
+            .run_system_once(|q: Single<BehaviorRef<T>, (With<TA>, With<TD>)>| {
+                (q.previous().copied(), *q.current())
+            })
+            .unwrap(),
+        (Some(A), D)
+    );
+    assert!(app
+        .world_mut()
+        .run_system_once(|q: Query<&TransitionQueue<T>>| { q.single().is_err() })
         .unwrap());
 }
 

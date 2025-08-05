@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use bevy_app::prelude::*;
 use bevy_reflect::{prelude::*, GetTypeRegistration, Typed};
 
-use crate::{Behavior, Memory, Transition, TransitionSequence};
+use crate::{Behavior, Memory, Transition, TransitionQueue};
 
 /// A [`Plugin`] for any [`Behavior`] type.
 ///
@@ -41,7 +41,7 @@ impl<T: RegisterableBehavior> Plugin for BehaviorPlugin<T> {
     fn build(&self, app: &mut App) {
         app.register_type::<Transition<T>>()
             .register_type::<Memory<T>>()
-            .register_type::<TransitionSequence<T>>()
+            .register_type::<TransitionQueue<T>>()
             .register_required_components::<T, Transition<T>>();
     }
 }

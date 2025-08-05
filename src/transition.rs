@@ -10,6 +10,7 @@ use bevy_ecs::prelude::*;
 use bevy_log::prelude::*;
 use bevy_reflect::prelude::*;
 use moonshine_kind::prelude::*;
+use moonshine_util::prelude::*;
 
 use crate::events::{OnActivate, OnStart};
 use crate::{
@@ -23,7 +24,7 @@ pub use self::Transition::{Interrupt, Next, Previous};
 /// This component is automatically registered as a required component for all types
 /// which implement the [`Behavior`] trait and and have their [`BehaviorPlugin`](crate::plugin::BehaviorPlugin) added.
 #[derive(Component, Clone, Debug, Reflect)]
-#[require(Memory<T>)]
+#[require(Expect<T>, Memory<T>)]
 #[reflect(Component)]
 pub enum Transition<T: Behavior> {
     #[doc(hidden)]
@@ -57,18 +58,14 @@ impl<T: Behavior> Default for Transition<T> {
 pub fn transition<T: Behavior>(
     components: &Components,
     mut query: Query<
-        (
-            Instance<T>,
-            BehaviorMut<T>,
-            Option<&mut TransitionSequence<T>>,
-        ),
-        Or<(Changed<Transition<T>>, With<TransitionSequence<T>>)>,
+        (Instance<T>, BehaviorMut<T>, Option<&mut TransitionQueue<T>>),
+        Or<(Changed<Transition<T>>, With<TransitionQueue<T>>)>,
     >,
     mut commands: Commands,
 ) {
     let id = components.valid_component_id::<T>().unwrap();
 
-    for (instance, mut behavior, sequence_opt) in &mut query {
+    for (instance, mut behavior, queue_opt) in &mut query {
         if behavior.current.is_added() {
             for (index, current) in behavior.enumerate() {
                 if let Some(previous_index) = index.previous() {
@@ -99,39 +96,39 @@ pub fn transition<T: Behavior>(
         // Index of the stopped behavior, if applicable.
         let mut stop_index = None;
 
-        let mut interrupt_sequence = false;
+        let mut interrupt_queue = false;
 
         match behavior.transition.take() {
             Next(next) => {
-                interrupt_sequence = !behavior.push(instance, next, components, &mut commands);
+                interrupt_queue = !behavior.push(instance, next, components, &mut commands);
             }
             Previous => {
                 stop_index = Some(behavior.current_index());
-                interrupt_sequence = !behavior.pop(instance, components, &mut commands);
+                interrupt_queue = !behavior.pop(instance, components, &mut commands);
             }
             Interrupt(Interruption::Start(next)) => {
                 behavior.interrupt(instance, next, components, &mut commands);
-                interrupt_sequence = true;
+                interrupt_queue = true;
             }
             Interrupt(Interruption::Resume(index)) => {
                 behavior.clear(instance, index, components, &mut commands);
-                interrupt_sequence = true;
+                interrupt_queue = true;
             }
             _ => {}
         }
 
-        let Some(sequence) = sequence_opt else {
+        let Some(queue) = queue_opt else {
             continue;
         };
 
-        if interrupt_sequence {
-            debug!("{instance:?}: sequence interrupted");
-            commands.entity(*instance).remove::<TransitionSequence<T>>();
-        } else if sequence.is_empty() {
-            debug!("{instance:?}: sequence finished");
-            commands.entity(*instance).remove::<TransitionSequence<T>>();
+        if interrupt_queue {
+            debug!("{instance:?}: queue interrupted");
+            commands.entity(*instance).remove::<TransitionQueue<T>>();
+        } else if queue.is_empty() {
+            debug!("{instance:?}: queue finished");
+            commands.entity(*instance).remove::<TransitionQueue<T>>();
         } else {
-            TransitionSequence::update(sequence, instance, behavior, stop_index);
+            TransitionQueue::update(queue, instance, behavior, stop_index);
         }
     }
 }
@@ -148,7 +145,7 @@ pub enum Interruption<T: Behavior> {
 
 #[doc(hidden)]
 #[deprecated(since = "0.2.1", note = "use `Changed<Transition<T>>` instead")]
-pub type TransitionChanged<T> = Or<(Changed<Transition<T>>, With<TransitionSequence<T>>)>;
+pub type TransitionChanged<T> = Or<(Changed<Transition<T>>, With<TransitionQueue<T>>)>;
 
 /// Represents an error during [`transition`].
 #[derive(Debug, PartialEq, Reflect)]
@@ -159,86 +156,130 @@ pub enum TransitionError<T: Behavior> {
     NoPrevious,
 }
 
-/// A queue of transitions to start automated behavior sequences.
+#[doc(hidden)]
+#[deprecated(since = "0.3.1", note = "use `TransitionQueue` instead")]
+pub type TransitionSequence<T> = TransitionQueue<T>;
+
+/// A queue of transitions to be invoked automatically.
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-pub struct TransitionSequence<T: Behavior> {
-    queue: VecDeque<TransitionSequenceElement<T>>,
-    wait_index: Option<BehaviorIndex>,
+#[require(Expect<Transition<T>>)]
+pub struct TransitionQueue<T: Behavior> {
+    queue: VecDeque<TransitionQueueItem<T>>,
+    wait_for: Option<BehaviorIndex>,
 }
 
-impl<T: Behavior> TransitionSequence<T> {
+impl<T: Behavior> TransitionQueue<T> {
     /// Creates a new transition sequence which starts all the given behaviors in given order.
+    #[deprecated(since = "0.3.1", note = "use `TransitionQueue::chain` instead")]
     pub fn new(items: impl IntoIterator<Item = T>) -> Self {
         Self {
-            queue: VecDeque::from_iter(items.into_iter().map(TransitionSequenceElement::Start)),
-            wait_index: None,
+            queue: VecDeque::from_iter(items.into_iter().map(TransitionQueueItem::Start)),
+            wait_for: None,
         }
     }
 
-    /// Creates an empty transition sequence.
+    /// Creates a new [`TransitionQueue`] which starts each given behavior in order.
+    ///
+    /// Unlike [`TransitionQueue::sequence`], a chain does not wait for the behaviors to stop
+    /// and starts the behaviors on top of each other. This is useful when you wish to load a set of
+    /// states onto the behavior stack (i.e. "Bird must Fly *and* Chirp").
+    ///
+    /// You must ensure that each transition in the chain is allowed (see [`Behavior::filter_next`]).
+    /// The sequence will stop if any transition fails.
+    pub fn chain(items: impl IntoIterator<Item = T>) -> Self {
+        Self {
+            queue: VecDeque::from_iter(items.into_iter().map(TransitionQueueItem::Start)),
+            wait_for: None,
+        }
+    }
+
+    /// Creates a new [`TransitionQueue`] which starts each given behavior in order,
+    /// waiting for each one to stop before starting the next.
+    ///
+    /// Unlike [`TransitionQueue::chain`], a sequence waits for each behavior to stop before starting the next.
+    /// This is useful when you want to queue some actions after each other (e.g. "Bird must Chirp, *then* Fly").
+    ///
+    /// You must ensure each transition from the current behavior to all elements in
+    /// the sequence is allowed (see [`Behavior::filter_next`]).
+    /// The sequence will stop if any transition fails.
+    pub fn sequence(items: impl IntoIterator<Item = T>) -> Self {
+        Self {
+            queue: VecDeque::from_iter(items.into_iter().map(TransitionQueueItem::StartWait)),
+            wait_for: None,
+        }
+    }
+
+    /// Creates an empty [`TransitionQueue`].
     pub fn empty() -> Self {
         Self {
             queue: VecDeque::new(),
-            wait_index: None,
+            wait_for: None,
         }
     }
 
-    /// Creates a new transition sequence which starts with the given behavior.
+    /// Creates a new [`TransitionQueue`] which starts with the given [`Behavior`].
     pub fn start(next: T) -> Self {
         let mut sequence = Self::empty();
-        sequence.push(TransitionSequenceElement::Start(next));
+        sequence.push(TransitionQueueItem::Start(next));
         sequence
     }
 
-    /// Creates a new transition sequence which starts with the given behavior and waits for it to finish.
+    /// Creates a new [`TransitionQueue`] which starts by stopping the current [`Behavior`].
+    pub fn stop() -> Self {
+        let mut sequence = Self::empty();
+        sequence.push(TransitionQueueItem::Stop);
+        sequence
+    }
+
+    /// Creates a new [`TransitionQueue`] which starts with the given [`Behavior`] and waits for it to stop.
     pub fn wait_for(next: T) -> Self {
         Self::empty().then_wait_for(next)
     }
 
-    /// Returns `true` if the sequence is empty.
+    /// Returns `true` if the [`TransitionQueue`] is empty.
     pub fn is_empty(&self) -> bool {
         self.queue.is_empty()
     }
 
-    /// Returns the number of transitions in the sequence.
+    /// Returns the number of transitions in the [`TransitionQueue`].
     pub fn len(&self) -> usize {
         self.queue.len()
     }
 
-    /// Starts the next behavior in the sequence.
+    /// Extends the [`TransitionQueue`] by starting the next [`Behavior`].
     pub fn then(mut self, next: T) -> Self {
-        self.push(TransitionSequenceElement::Start(next));
+        self.push(TransitionQueueItem::Start(next));
         self
     }
 
-    /// Starts the next behavior in the sequence and waits for it to finish.
+    /// Extends the [`TransitionQueue`] by starting the next [`Behavior`] and waiting for it to stop.
     pub fn then_wait_for(mut self, next: T) -> Self {
-        self.push(TransitionSequenceElement::StartWait(next));
+        self.push(TransitionQueueItem::StartWait(next));
         self
     }
 
-    /// Stops the current behavior.
+    /// Extends the [`TransitionQueue`] by stopping the current [`Behavior`].
     pub fn then_stop(mut self) -> Self {
-        self.push(TransitionSequenceElement::Stop);
+        self.push(TransitionQueueItem::Stop);
         self
     }
 
-    fn push(&mut self, next: TransitionSequenceElement<T>) {
+    fn push(&mut self, next: TransitionQueueItem<T>) {
         self.queue.push_back(next);
     }
 }
 
-impl<T: Behavior> TransitionSequence<T> {
+impl<T: Behavior> TransitionQueue<T> {
     pub(crate) fn update(
         mut this: Mut<Self>,
         instance: Instance<T>,
         mut behavior: BehaviorMutItem<T>,
         stop_index: Option<BehaviorIndex>,
     ) {
-        debug_assert!(!this.queue.is_empty());
+        debug_assert!(!this.is_empty());
 
-        if let Some(wait_index) = this.wait_index {
+        if let Some(wait_index) = this.wait_for {
             if let Some(stop_index) = stop_index {
                 if wait_index != stop_index {
                     return;
@@ -248,21 +289,21 @@ impl<T: Behavior> TransitionSequence<T> {
             }
         }
 
-        debug!("{instance:?}: sequence steps = {:?}", this.queue.len());
+        debug!("{instance:?}: queue length = {:?}", this.len());
 
         if let Some(element) = this.queue.pop_front() {
-            use TransitionSequenceElement::*;
+            use TransitionQueueItem::*;
             match element {
                 Start(next) => {
-                    this.wait_index = None;
+                    this.wait_for = None;
                     behavior.start(next);
                 }
                 StartWait(next) => {
-                    this.wait_index = Some(behavior.current_index().next());
+                    this.wait_for = Some(behavior.current_index().next());
                     behavior.start(next);
                 }
                 Stop => {
-                    this.wait_index = None;
+                    this.wait_for = None;
                     behavior.stop();
                 }
             }
@@ -271,7 +312,7 @@ impl<T: Behavior> TransitionSequence<T> {
 }
 
 #[derive(Debug, Reflect)]
-enum TransitionSequenceElement<T: Behavior> {
+enum TransitionQueueItem<T: Behavior> {
     Start(T),
     StartWait(T),
     Stop,

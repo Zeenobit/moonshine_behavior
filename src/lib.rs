@@ -7,13 +7,16 @@ pub mod prelude {
     pub use moonshine_kind::{Instance, InstanceCommands};
 
     pub use crate::transition::{
-        transition, Interrupt, Interruption, Next, Previous, Transition, TransitionSequence,
+        transition, Interrupt, Interruption, Next, Previous, Transition, TransitionQueue,
     };
 
     pub use crate::events::{OnActivate, OnPause, OnResume, OnStart, OnStop};
     pub use crate::plugin::BehaviorPlugin;
 
     pub use crate::match_next;
+
+    #[allow(deprecated)]
+    pub use crate::transition::TransitionSequence;
 }
 
 pub mod events;
@@ -207,7 +210,7 @@ pub struct BehaviorRef<T: Behavior> {
     current: Ref<'static, T>,
     memory: &'static Memory<T>,
     transition: &'static Transition<T>,
-    sequence: Has<TransitionSequence<T>>,
+    sequence: Has<TransitionQueue<T>>,
 }
 
 impl<T: Behavior> BehaviorRef<T> {
@@ -217,7 +220,7 @@ impl<T: Behavior> BehaviorRef<T> {
             current: entity.get_ref::<T>()?,
             memory: entity.get::<Memory<T>>()?,
             transition: entity.get::<Transition<T>>()?,
-            sequence: entity.contains::<TransitionSequence<T>>(),
+            sequence: entity.contains::<TransitionQueue<T>>(),
         })
     }
 }
@@ -315,7 +318,7 @@ pub struct BehaviorMut<T: Behavior> {
     current: Mut<'static, T>,
     memory: &'static mut Memory<T>,
     transition: &'static mut Transition<T>,
-    sequence: Has<TransitionSequence<T>>,
+    sequence: Has<TransitionQueue<T>>,
 }
 
 impl<T: Behavior> BehaviorItem for BehaviorMutReadOnlyItem<'_, T> {
