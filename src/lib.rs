@@ -187,11 +187,6 @@ pub trait BehaviorItem {
     ///
     /// Because of this, this method is useful to avoid unintentional transition overrides.
     fn has_transition(&self) -> bool;
-
-    /// Returns `true` if there is any [`TransitionSequence`] running on this [`Behavior`].
-    ///
-    /// This is useful to allow transition sequences to finish before starting a new behavior.
-    fn has_sequence(&self) -> bool;
 }
 
 /// Query data for a [`Behavior`].
@@ -248,10 +243,6 @@ impl<T: Behavior> BehaviorItem for BehaviorRefItem<'_, T> {
 
     fn has_transition(&self) -> bool {
         !self.transition.is_none()
-    }
-
-    fn has_sequence(&self) -> bool {
-        self.sequence
     }
 }
 
@@ -316,7 +307,6 @@ pub struct BehaviorMut<T: Behavior> {
     current: Mut<'static, T>,
     memory: &'static mut Memory<T>,
     transition: &'static mut Transition<T>,
-    sequence: Has<TransitionQueue<T>>,
 }
 
 impl<T: Behavior> BehaviorItem for BehaviorMutReadOnlyItem<'_, T> {
@@ -344,10 +334,6 @@ impl<T: Behavior> BehaviorItem for BehaviorMutReadOnlyItem<'_, T> {
 
     fn has_transition(&self) -> bool {
         !self.transition.is_none()
-    }
-
-    fn has_sequence(&self) -> bool {
-        self.sequence
     }
 }
 
@@ -424,10 +410,6 @@ impl<T: Behavior> BehaviorItem for BehaviorMutItem<'_, T> {
 
     fn has_transition(&self) -> bool {
         !self.transition.is_none()
-    }
-
-    fn has_sequence(&self) -> bool {
-        self.sequence
     }
 }
 
