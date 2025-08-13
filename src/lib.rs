@@ -172,6 +172,9 @@ pub trait BehaviorItem {
         self.enumerate().map(|(_, behavior)| behavior)
     }
 
+    /// Returns a reference to the [`Behavior`] at the given [`BehaviorIndex`], if it exists.
+    fn get(&self, index: BehaviorIndex) -> Option<&Self::Behavior>;
+
     /// Returns `true` if there is any pending [`Transition`] for this [`Behavior`].
     ///
     /// # Usage
@@ -239,6 +242,14 @@ impl<T: Behavior> BehaviorItem for BehaviorRefItem<'_, T> {
             .enumerate()
             .map(|(index, item)| (BehaviorIndex(index), item))
             .chain(std::iter::once((self.current_index(), self.current())))
+    }
+
+    fn get(&self, BehaviorIndex(index): BehaviorIndex) -> Option<&T> {
+        if index == self.memory.stack.len() {
+            Some(self.current())
+        } else {
+            self.memory.get(index)
+        }
     }
 
     fn has_transition(&self) -> bool {
@@ -332,6 +343,14 @@ impl<T: Behavior> BehaviorItem for BehaviorMutReadOnlyItem<'_, T> {
             .chain(std::iter::once((self.current_index(), self.current())))
     }
 
+    fn get(&self, BehaviorIndex(index): BehaviorIndex) -> Option<&T> {
+        if index == self.memory.stack.len() {
+            Some(self.current())
+        } else {
+            self.memory.get(index)
+        }
+    }
+
     fn has_transition(&self) -> bool {
         !self.transition.is_none()
     }
@@ -406,6 +425,14 @@ impl<T: Behavior> BehaviorItem for BehaviorMutItem<'_, T> {
             .enumerate()
             .map(|(index, item)| (BehaviorIndex(index), item))
             .chain(std::iter::once((self.current_index(), self.current())))
+    }
+
+    fn get(&self, BehaviorIndex(index): BehaviorIndex) -> Option<&T> {
+        if index == self.memory.stack.len() {
+            Some(self.current())
+        } else {
+            self.memory.get(index)
+        }
     }
 
     fn has_transition(&self) -> bool {
