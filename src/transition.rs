@@ -12,10 +12,7 @@ use bevy_reflect::prelude::*;
 use moonshine_kind::prelude::*;
 use moonshine_util::prelude::*;
 
-use crate::events::{OnActivate, OnStart};
-use crate::{
-    Behavior, BehaviorHooks, BehaviorIndex, BehaviorItem, BehaviorMut, BehaviorMutItem, Memory,
-};
+use crate::{Behavior, BehaviorIndex, BehaviorItem, BehaviorMut, BehaviorMutItem, Memory};
 
 pub use self::Transition::{Interrupt, Next, Previous};
 
@@ -63,36 +60,7 @@ pub fn transition<T: Behavior>(
     >,
     mut commands: Commands,
 ) {
-    let id = components.valid_component_id::<T>().unwrap();
-
     for (instance, mut behavior, queue_opt) in &mut query {
-        if behavior.current.is_added() {
-            for (index, current) in behavior.enumerate() {
-                if let Some(previous_index) = index.previous() {
-                    let previous = &behavior[previous_index];
-                    previous.invoke_pause(current, commands.instance(instance));
-                    behavior[index].invoke_start(Some(previous), commands.instance(instance));
-                } else {
-                    behavior[index].invoke_start(None, commands.instance(instance));
-                }
-                commands.trigger_targets(
-                    OnStart {
-                        index,
-                        initialize: true,
-                    },
-                    (*instance, id),
-                );
-                commands.trigger_targets(
-                    OnActivate {
-                        index,
-                        resume: false,
-                        initialize: true,
-                    },
-                    (*instance, id),
-                );
-            }
-        }
-
         // Index of the stopped behavior, if applicable.
         let mut stop_index = None;
 

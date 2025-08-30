@@ -706,7 +706,6 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
                 commands.trigger_targets(
                     OnStart {
                         index: BehaviorIndex(next_index),
-                        initialize: false,
                     },
                     (*instance, id),
                 );
@@ -714,7 +713,6 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
                     OnActivate {
                         index: BehaviorIndex(next_index),
                         resume: false,
-                        initialize: false,
                     },
                     (*instance, id),
                 );
@@ -739,7 +737,6 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
                 commands.trigger_targets(
                     OnStart {
                         index: BehaviorIndex(index),
-                        initialize: false,
                     },
                     (*instance, id),
                 );
@@ -747,7 +744,6 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
                     OnActivate {
                         index: BehaviorIndex(index),
                         resume: false,
-                        initialize: false,
                     },
                     (*instance, id),
                 );
@@ -837,7 +833,6 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
                 OnActivate {
                     index: BehaviorIndex(next_index),
                     resume: true,
-                    initialize: false,
                 },
                 (*instance, id),
             );

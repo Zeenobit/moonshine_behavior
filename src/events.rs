@@ -56,15 +56,6 @@ use crate::{Behavior, BehaviorIndex};
 pub struct OnStart {
     /// The index of the behavior that was started.
     pub index: BehaviorIndex,
-    /// If true, it indicates the behavior stack is initializing.
-    ///
-    /// This parameter is always true for the initial behavior.
-    /// You should check this flag to avoid performing redundant logic.
-    ///
-    /// For example, a `Bird` may perform a wing flap sound effect every time it starts flying.
-    /// However, if you load a saved game (i.e. initialize) and the bird is already flying,
-    /// you may want to skip the sound effect.
-    pub initialize: bool,
 }
 
 /// An event which is triggered when a [`Behavior`] is paused.
@@ -89,10 +80,6 @@ pub struct OnActivate {
     pub index: BehaviorIndex,
     /// Whether the behavior was resumed or started.
     pub resume: bool,
-    /// If true, it indicates the behavior stack is initializing.
-    ///
-    /// See [`OnStart::initialize`] for details.
-    pub initialize: bool,
 }
 
 // TODO: OnSuspend, This gets tricky because the behavior state is already gone in `OnStop` ...
