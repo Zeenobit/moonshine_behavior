@@ -2,6 +2,7 @@ use std::marker::PhantomData;
 
 use bevy_app::prelude::*;
 use bevy_reflect::{prelude::*, GetTypeRegistration, Typed};
+use moonshine_util::reflect::Registerable;
 
 use crate::{Behavior, Memory, Transition, TransitionQueue};
 
@@ -37,7 +38,7 @@ impl<T: Behavior> Default for BehaviorPlugin<T> {
     }
 }
 
-impl<T: RegisterableBehavior> Plugin for BehaviorPlugin<T> {
+impl<T: Behavior + Registerable> Plugin for BehaviorPlugin<T> {
     fn build(&self, app: &mut App) {
         app.register_type::<Transition<T>>()
             .register_type::<Memory<T>>()
@@ -45,8 +46,3 @@ impl<T: RegisterableBehavior> Plugin for BehaviorPlugin<T> {
             .register_required_components::<T, Transition<T>>();
     }
 }
-
-#[doc(hidden)]
-pub trait RegisterableBehavior: Behavior + FromReflect + GetTypeRegistration + Typed {}
-
-impl<T: Behavior + FromReflect + GetTypeRegistration + Typed> RegisterableBehavior for T {}
