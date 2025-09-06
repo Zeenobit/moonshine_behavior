@@ -1,7 +1,6 @@
 use std::marker::PhantomData;
 
 use bevy_app::prelude::*;
-use bevy_reflect::{prelude::*, GetTypeRegistration, Typed};
 use moonshine_util::reflect::Registerable;
 
 use crate::{Behavior, Memory, Transition, TransitionQueue};
