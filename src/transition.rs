@@ -221,6 +221,32 @@ impl<T: Behavior> TransitionQueue<T> {
         self
     }
 
+    /// Extends the [`TransitionQueue`] by starting the next [`Behavior`] if and only if `condition` is true.
+    ///
+    /// This is just a convenient shortcut useful when creating complex queues, for example:
+    /// ```
+    /// use bevy::prelude::*;
+    /// use moonshine_behavior::prelude::*;
+    ///
+    /// #[derive(Component, Debug)]
+    /// pub enum Foo {
+    ///     Bar,
+    ///     Baz,
+    /// }
+    ///
+    /// impl Behavior for Foo {}
+    ///
+    /// fn make_queue(baz: bool) -> TransitionQueue<Foo> {
+    ///     TransitionQueue::start(Foo::Bar).then_if(baz, Foo::Baz)
+    /// }
+    /// ```
+    pub fn then_if(self, condition: bool, next: T) -> Self {
+        if condition {
+            return self.then(next);
+        }
+        self
+    }
+
     /// Extends the [`TransitionQueue`] by starting the next [`Behavior`] and waiting for it to stop.
     pub fn then_wait_for(mut self, next: T) -> Self {
         self.push(TransitionQueueItem::StartWait(next));
