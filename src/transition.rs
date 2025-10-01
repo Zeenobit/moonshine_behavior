@@ -6,13 +6,17 @@ use std::collections::VecDeque;
 use std::fmt::Debug;
 
 use bevy_ecs::component::Components;
+use bevy_ecs::event::EntityComponentsTrigger;
 use bevy_ecs::prelude::*;
 use bevy_log::prelude::*;
 use bevy_reflect::prelude::*;
 use moonshine_kind::prelude::*;
 use moonshine_util::prelude::*;
 
-use crate::{Behavior, BehaviorIndex, BehaviorItem, BehaviorMut, BehaviorMutItem, Memory};
+use crate::events::Start;
+use crate::{
+    Behavior, BehaviorHooks, BehaviorIndex, BehaviorItem, BehaviorMut, BehaviorMutItem, Memory,
+};
 
 pub use self::Transition::{Interrupt, Next, Previous};
 
@@ -62,6 +66,25 @@ pub fn transition<T: Behavior>(
     mut commands: Commands,
 ) {
     for (instance, mut behavior, queue_opt) in &mut query {
+        let entity = instance.entity();
+        let component_id = components.valid_component_id::<T>().unwrap();
+        let components = [component_id];
+
+        if behavior.is_added() {
+            behavior.invoke_start(None, commands.instance(instance));
+            commands.queue(move |world: &mut World| {
+                world.trigger_with(
+                    Start {
+                        entity,
+                        index: BehaviorIndex::initial(),
+                    },
+                    EntityComponentsTrigger {
+                        components: &components,
+                    },
+                );
+            });
+        }
+
         // Index of the stopped behavior, if applicable.
         let mut stop_index = None;
 
@@ -69,18 +92,18 @@ pub fn transition<T: Behavior>(
 
         match behavior.transition.take() {
             Next(next) => {
-                interrupt_queue = !behavior.push(instance, next, components, &mut commands);
+                interrupt_queue = !behavior.push(instance, next, component_id, &mut commands);
             }
             Previous => {
                 stop_index = Some(behavior.current_index());
-                interrupt_queue = !behavior.pop(instance, components, &mut commands);
+                interrupt_queue = !behavior.pop(instance, component_id, &mut commands);
             }
             Interrupt(Interruption::Start(next)) => {
-                behavior.interrupt(instance, next, components, &mut commands);
+                behavior.interrupt(instance, next, component_id, &mut commands);
                 interrupt_queue = true;
             }
             Interrupt(Interruption::Resume(index)) => {
-                behavior.clear(instance, index, components, &mut commands);
+                behavior.clear(instance, index, component_id, &mut commands);
                 interrupt_queue = true;
             }
             _ => {}
@@ -92,10 +115,10 @@ pub fn transition<T: Behavior>(
 
         if interrupt_queue {
             debug!("{instance:?}: queue interrupted");
-            commands.entity(*instance).remove::<TransitionQueue<T>>();
+            commands.entity(entity).remove::<TransitionQueue<T>>();
         } else if queue.is_empty() {
             debug!("{instance:?}: queue finished");
-            commands.entity(*instance).remove::<TransitionQueue<T>>();
+            commands.entity(entity).remove::<TransitionQueue<T>>();
         } else {
             TransitionQueue::update(queue, instance, behavior, stop_index);
         }

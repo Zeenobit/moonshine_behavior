@@ -35,7 +35,7 @@ use std::ops::{Deref, DerefMut, Index, IndexMut};
 
 use bevy_derive::{Deref, DerefMut};
 use bevy_ecs::change_detection::MaybeLocation;
-use bevy_ecs::component::{Components, Mutable, Tick};
+use bevy_ecs::component::{ComponentId, Mutable, Tick};
 use bevy_ecs::event::EntityComponentsTrigger;
 use bevy_ecs::{prelude::*, query::QueryData};
 use bevy_log::prelude::*;
@@ -676,11 +676,10 @@ impl<T: Behavior> BehaviorMutItem<'_, '_, T> {
         &mut self,
         instance: Instance<T>,
         mut next: T,
-        components: &Components,
+        component_id: ComponentId,
         commands: &mut Commands,
     ) -> bool {
         let entity = instance.entity();
-        let id = components.valid_component_id::<T>().unwrap();
 
         if self.filter_next(&next) {
             let previous = {
@@ -699,7 +698,7 @@ impl<T: Behavior> BehaviorMutItem<'_, '_, T> {
                 previous.invoke_pause(&self.current, commands.instance(instance));
 
                 commands.queue(move |world: &mut World| {
-                    let components = [id];
+                    let components = [component_id];
                     world.trigger_with(
                         Pause {
                             entity,
@@ -740,7 +739,7 @@ impl<T: Behavior> BehaviorMutItem<'_, '_, T> {
                 previous.invoke_stop(&self.current, commands.instance(instance));
 
                 commands.queue(move |world: &mut World| {
-                    let components = [id];
+                    let components = [component_id];
                     world.trigger_with(
                         Stop {
                             entity,
@@ -781,7 +780,7 @@ impl<T: Behavior> BehaviorMutItem<'_, '_, T> {
             );
 
             commands.queue(move |world: &mut World| {
-                let components = [id];
+                let components = [component_id];
                 world.trigger_with(
                     Error {
                         entity,
@@ -801,11 +800,10 @@ impl<T: Behavior> BehaviorMutItem<'_, '_, T> {
         &mut self,
         instance: Instance<T>,
         next: T,
-        components: &Components,
+        component_id: ComponentId,
         commands: &mut Commands,
     ) {
         let entity = instance.entity();
-        let id = components.valid_component_id::<T>().unwrap();
 
         while self.filter_yield(&next) && !self.memory.is_empty() {
             let index = self.memory.len();
@@ -818,7 +816,7 @@ impl<T: Behavior> BehaviorMutItem<'_, '_, T> {
                 previous.invoke_stop(&self.current, commands.instance(instance));
 
                 commands.queue(move |world: &mut World| {
-                    let components = [id];
+                    let components = [component_id];
                     world.trigger_with(
                         Stop {
                             entity,
@@ -834,18 +832,17 @@ impl<T: Behavior> BehaviorMutItem<'_, '_, T> {
             }
         }
 
-        self.push(instance, next, components, commands);
+        self.push(instance, next, component_id, commands);
     }
 
     fn pop(
         &mut self,
         instance: Instance<T>,
-        components: &Components,
+        component_id: ComponentId,
         commands: &mut Commands,
     ) -> bool {
         let entity = instance.entity();
         let index = self.memory.len();
-        let id = components.valid_component_id::<T>().unwrap();
 
         if let Some(mut next) = self.memory.pop() {
             let next_index = self.memory.len();
@@ -861,7 +858,7 @@ impl<T: Behavior> BehaviorMutItem<'_, '_, T> {
             previous.invoke_stop(&self.current, commands.instance(instance));
 
             commands.queue(move |world: &mut World| {
-                let components = [id];
+                let components = [component_id];
 
                 world.trigger_with(
                     Stop {
@@ -902,7 +899,7 @@ impl<T: Behavior> BehaviorMutItem<'_, '_, T> {
             );
 
             commands.queue(move |world: &mut World| {
-                let components = [id];
+                let components = [component_id];
                 world.trigger_with(
                     Error {
                         entity,
@@ -922,11 +919,10 @@ impl<T: Behavior> BehaviorMutItem<'_, '_, T> {
         &mut self,
         instance: Instance<T>,
         index: BehaviorIndex,
-        components: &Components,
+        component_id: ComponentId,
         commands: &mut Commands,
     ) {
         let entity = instance.entity();
-        let id = components.valid_component_id::<T>().unwrap();
 
         // Stop all states except the one above the given index
         while self.current_index() > index.next() {
@@ -937,7 +933,7 @@ impl<T: Behavior> BehaviorMutItem<'_, '_, T> {
             previous.invoke_stop(next, commands.instance(instance));
 
             commands.queue(move |world: &mut World| {
-                let components = [id];
+                let components = [component_id];
                 world.trigger_with(
                     Stop {
                         entity,
@@ -953,7 +949,7 @@ impl<T: Behavior> BehaviorMutItem<'_, '_, T> {
         }
 
         // Pop the state above the given index
-        self.pop(instance, components, commands);
+        self.pop(instance, component_id, commands);
     }
 }
 
