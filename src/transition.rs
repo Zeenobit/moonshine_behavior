@@ -52,6 +52,7 @@ impl<T: Behavior> Default for Transition<T> {
 }
 
 /// A system which processes [`Behavior`] [`Transitions`](Transition).
+#[allow(clippy::type_complexity)]
 pub fn transition<T: Behavior>(
     components: &Components,
     mut query: Query<

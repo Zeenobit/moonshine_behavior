@@ -1,5 +1,7 @@
 #![doc = include_str!("../README.md")]
 #![warn(missing_docs)]
+#![allow(clippy::match_single_binding)] // For default trait method impls
+#![allow(clippy::match_like_matches_macro)]
 
 /// Common elements for [`Behavior`] query and management.
 pub mod prelude {
@@ -10,7 +12,7 @@ pub mod prelude {
         transition, Interrupt, Interruption, Next, Previous, Transition, TransitionQueue,
     };
 
-    pub use crate::events::{OnActivate, OnPause, OnResume, OnStart, OnStop};
+    pub use crate::events::{Activate, Pause, Resume, Start, Stop};
     pub use crate::plugin::BehaviorPlugin;
 
     pub use crate::match_next;
@@ -34,6 +36,7 @@ use std::ops::{Deref, DerefMut, Index, IndexMut};
 use bevy_derive::{Deref, DerefMut};
 use bevy_ecs::change_detection::MaybeLocation;
 use bevy_ecs::component::{Components, Mutable, Tick};
+use bevy_ecs::event::EntityComponentsTrigger;
 use bevy_ecs::{prelude::*, query::QueryData};
 use bevy_log::prelude::*;
 use bevy_reflect::prelude::*;
@@ -41,7 +44,7 @@ use moonshine_kind::prelude::*;
 
 pub use plugin::BehaviorPlugin;
 
-use crate::events::{OnActivate, OnError, OnPause, OnResume, OnStart, OnStop};
+use crate::events::{Activate, Error, Pause, Resume, Start, Stop};
 
 use self::transition::*;
 
@@ -66,7 +69,7 @@ pub trait Behavior: Component<Mutability = Mutable> + Debug + Sized {
     /// Called before a new behavior is started.
     ///
     /// If this returns `false`, the transition fails.
-    /// See [`Error`](crate::events::BehaviorEvent) for details on how to handle transition failures.
+    /// See [`Error`] for details on how to handle transition failures.
     fn filter_next(&self, next: &Self) -> bool {
         match_next! {
             self => next,
@@ -77,7 +80,7 @@ pub trait Behavior: Component<Mutability = Mutable> + Debug + Sized {
     /// Called after a behavior is paused.
     ///
     /// If this returns `false`, the paused behavior will be stopped immediatedly and discarded.
-    /// No [`Pause`](crate::events::BehaviorEvent) event will be sent in this case.
+    /// No [`Pause`] event will be sent in this case.
     fn is_resumable(&self) -> bool {
         match self {
             _ => true,
@@ -143,7 +146,7 @@ pub trait BehaviorItem {
     /// Note that this is **NOT** the previously active state.
     /// Instead, this is the previous state which was active before the current one was started.
     ///
-    /// To access the previously active state, handle [`Stop`](crate::events::BehaviorEvent::Stop) instead.
+    /// To access the previously active state, handle [`Stop`] instead.
     fn previous(&self) -> Option<&Self::Behavior>;
 
     /// Returns the [`BehaviorIndex`] associated with the current [`Behavior`] state.
@@ -199,8 +202,7 @@ pub trait BehaviorItem {
 /// This provides a read-only reference to the current behavior state and all previous states in the stack.
 ///
 /// Additionally, it provides methods to check for pending transitions ([`has_transition`](BehaviorRefItem::has_transition)),
-/// active transition sequences ([`has_sequence`](BehaviorRefItem::has_sequence)) and the current
-/// behavior index ([`index`](BehaviorRefItem::index)).
+/// and the current behavior index ([`index`](BehaviorRefItem::index)).
 #[derive(QueryData)]
 pub struct BehaviorRef<T: Behavior> {
     current: Ref<'static, T>,
@@ -221,7 +223,7 @@ impl<T: Behavior> BehaviorRef<T> {
     }
 }
 
-impl<T: Behavior> BehaviorItem for BehaviorRefItem<'_, T> {
+impl<T: Behavior> BehaviorItem for BehaviorRefItem<'_, '_, T> {
     type Behavior = T;
 
     fn current(&self) -> &T {
@@ -257,7 +259,7 @@ impl<T: Behavior> BehaviorItem for BehaviorRefItem<'_, T> {
     }
 }
 
-impl<T: Behavior> Deref for BehaviorRefItem<'_, T> {
+impl<T: Behavior> Deref for BehaviorRefItem<'_, '_, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -265,13 +267,13 @@ impl<T: Behavior> Deref for BehaviorRefItem<'_, T> {
     }
 }
 
-impl<T: Behavior> AsRef<T> for BehaviorRefItem<'_, T> {
+impl<T: Behavior> AsRef<T> for BehaviorRefItem<'_, '_, T> {
     fn as_ref(&self) -> &T {
         &self.current
     }
 }
 
-impl<T: Behavior> DetectChanges for BehaviorRefItem<'_, T> {
+impl<T: Behavior> DetectChanges for BehaviorRefItem<'_, '_, T> {
     fn is_added(&self) -> bool {
         self.current.is_added()
     }
@@ -293,7 +295,7 @@ impl<T: Behavior> DetectChanges for BehaviorRefItem<'_, T> {
     }
 }
 
-impl<T: Behavior> Index<BehaviorIndex> for BehaviorRefItem<'_, T> {
+impl<T: Behavior> Index<BehaviorIndex> for BehaviorRefItem<'_, '_, T> {
     type Output = T;
 
     fn index(&self, BehaviorIndex(index): BehaviorIndex) -> &Self::Output {
@@ -320,7 +322,7 @@ pub struct BehaviorMut<T: Behavior> {
     transition: &'static mut Transition<T>,
 }
 
-impl<T: Behavior> BehaviorItem for BehaviorMutReadOnlyItem<'_, T> {
+impl<T: Behavior> BehaviorItem for BehaviorMutReadOnlyItem<'_, '_, T> {
     type Behavior = T;
 
     fn current(&self) -> &T {
@@ -356,7 +358,7 @@ impl<T: Behavior> BehaviorItem for BehaviorMutReadOnlyItem<'_, T> {
     }
 }
 
-impl<T: Behavior> Deref for BehaviorMutReadOnlyItem<'_, T> {
+impl<T: Behavior> Deref for BehaviorMutReadOnlyItem<'_, '_, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -364,13 +366,13 @@ impl<T: Behavior> Deref for BehaviorMutReadOnlyItem<'_, T> {
     }
 }
 
-impl<T: Behavior> AsRef<T> for BehaviorMutReadOnlyItem<'_, T> {
+impl<T: Behavior> AsRef<T> for BehaviorMutReadOnlyItem<'_, '_, T> {
     fn as_ref(&self) -> &T {
         self.current.as_ref()
     }
 }
 
-impl<T: Behavior> DetectChanges for BehaviorMutReadOnlyItem<'_, T> {
+impl<T: Behavior> DetectChanges for BehaviorMutReadOnlyItem<'_, '_, T> {
     fn is_added(&self) -> bool {
         self.current.is_added()
     }
@@ -392,7 +394,7 @@ impl<T: Behavior> DetectChanges for BehaviorMutReadOnlyItem<'_, T> {
     }
 }
 
-impl<T: Behavior> Index<BehaviorIndex> for BehaviorMutReadOnlyItem<'_, T> {
+impl<T: Behavior> Index<BehaviorIndex> for BehaviorMutReadOnlyItem<'_, '_, T> {
     type Output = T;
 
     fn index(&self, BehaviorIndex(index): BehaviorIndex) -> &Self::Output {
@@ -404,7 +406,7 @@ impl<T: Behavior> Index<BehaviorIndex> for BehaviorMutReadOnlyItem<'_, T> {
     }
 }
 
-impl<T: Behavior> BehaviorItem for BehaviorMutItem<'_, T> {
+impl<T: Behavior> BehaviorItem for BehaviorMutItem<'_, '_, T> {
     type Behavior = T;
 
     fn current(&self) -> &T {
@@ -440,9 +442,7 @@ impl<T: Behavior> BehaviorItem for BehaviorMutItem<'_, T> {
     }
 }
 
-impl<T: Behavior> BehaviorMutItem<'_, T> {
-    /// Returns the current [`Behavior`] state.
-
+impl<T: Behavior> BehaviorMutItem<'_, '_, T> {
     /// Returns the current [`Behavior`] state as a mutable.
     pub fn current_mut(&mut self) -> &mut T {
         self.current.as_mut()
@@ -481,7 +481,7 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
     /// This operation pushes the current behavior onto the stack and inserts the new behavior.
     ///
     /// Note that this will fail if the current behavior rejects `next` through [`Behavior::filter_next`].
-    /// See [`Error`](crate::events::BehaviorEvent) for details on how to handle transition failures.
+    /// See [`Error`] for details on how to handle transition failures.
     #[track_caller]
     pub fn start(&mut self, next: T) {
         self.start_with_caller(next, MaybeLocation::caller());
@@ -495,7 +495,7 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
     /// and when the [`transition`](crate::transition::transition) system runs.
     ///
     /// Do **NOT** use this method to react to transition failures.
-    /// See [`Error`](crate::events::BehaviorEvent) for details on how to correctly handle transition failures.
+    /// See [`Error`] for details on how to correctly handle transition failures.
     ///
     /// # Usage
     ///
@@ -530,7 +530,7 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
     /// The initial behavior is never allowed to yield.
     ///
     /// Note that this will fail if the first non-yielding behavior rejects `next` through [`Behavior::filter_next`].
-    /// See [`Error`](crate::events::BehaviorEvent) for details on how to handle transition failures.
+    /// See [`Error`] for details on how to handle transition failures.
     #[track_caller]
     pub fn interrupt_start(&mut self, next: T) {
         self.interrupt_start_with_caller(next, MaybeLocation::caller());
@@ -615,7 +615,7 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
     /// This operation pops the current behavior off the stack and resumes the previous behavior.
     ///
     /// Note that this will fail if the current behavior is the initial behavior.
-    /// See [`Error`](crate::events::BehaviorEvent) for details on how to handle transition failures.
+    /// See [`Error`] for details on how to handle transition failures.
     #[track_caller]
     pub fn stop(&mut self) {
         self.stop_with_caller(MaybeLocation::caller());
@@ -679,6 +679,7 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
         components: &Components,
         commands: &mut Commands,
     ) -> bool {
+        let entity = instance.entity();
         let id = components.valid_component_id::<T>().unwrap();
 
         if self.filter_next(&next) {
@@ -697,25 +698,37 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
 
                 previous.invoke_pause(&self.current, commands.instance(instance));
 
-                commands.trigger_targets(
-                    OnPause {
-                        index: BehaviorIndex(index),
-                    },
-                    (*instance, id),
-                );
-                commands.trigger_targets(
-                    OnStart {
-                        index: BehaviorIndex(next_index),
-                    },
-                    (*instance, id),
-                );
-                commands.trigger_targets(
-                    OnActivate {
-                        index: BehaviorIndex(next_index),
-                        resume: false,
-                    },
-                    (*instance, id),
-                );
+                commands.queue(move |world: &mut World| {
+                    let components = [id];
+                    world.trigger_with(
+                        Pause {
+                            entity,
+                            index: BehaviorIndex(index),
+                        },
+                        EntityComponentsTrigger {
+                            components: &components,
+                        },
+                    );
+                    world.trigger_with(
+                        Start {
+                            entity,
+                            index: BehaviorIndex(next_index),
+                        },
+                        EntityComponentsTrigger {
+                            components: &components,
+                        },
+                    );
+                    world.trigger_with(
+                        Activate {
+                            entity,
+                            index: BehaviorIndex(next_index),
+                            resume: false,
+                        },
+                        EntityComponentsTrigger {
+                            components: &components,
+                        },
+                    );
+                });
 
                 self.memory.push(previous);
             } else {
@@ -726,27 +739,39 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
 
                 previous.invoke_stop(&self.current, commands.instance(instance));
 
-                commands.trigger_targets(
-                    OnStop {
-                        index: BehaviorIndex(index),
-                        behavior: previous,
-                        interrupt: false,
-                    },
-                    (*instance, id),
-                );
-                commands.trigger_targets(
-                    OnStart {
-                        index: BehaviorIndex(index),
-                    },
-                    (*instance, id),
-                );
-                commands.trigger_targets(
-                    OnActivate {
-                        index: BehaviorIndex(index),
-                        resume: false,
-                    },
-                    (*instance, id),
-                );
+                commands.queue(move |world: &mut World| {
+                    let components = [id];
+                    world.trigger_with(
+                        Stop {
+                            entity,
+                            index: BehaviorIndex(index),
+                            behavior: previous,
+                            interrupt: false,
+                        },
+                        EntityComponentsTrigger {
+                            components: &components,
+                        },
+                    );
+                    world.trigger_with(
+                        Start {
+                            entity,
+                            index: BehaviorIndex(index),
+                        },
+                        EntityComponentsTrigger {
+                            components: &components,
+                        },
+                    );
+                    world.trigger_with(
+                        Activate {
+                            entity,
+                            index: BehaviorIndex(index),
+                            resume: false,
+                        },
+                        EntityComponentsTrigger {
+                            components: &components,
+                        },
+                    );
+                })
             }
             true
         } else {
@@ -755,10 +780,19 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
                 *self.current
             );
 
-            commands.trigger_targets(
-                OnError(TransitionError::RejectedNext(next)),
-                (*instance, id),
-            );
+            commands.queue(move |world: &mut World| {
+                let components = [id];
+                world.trigger_with(
+                    Error {
+                        entity,
+                        error: TransitionError::RejectedNext(next),
+                    },
+                    EntityComponentsTrigger {
+                        components: &components,
+                    },
+                );
+            });
+
             false
         }
     }
@@ -770,6 +804,7 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
         components: &Components,
         commands: &mut Commands,
     ) {
+        let entity = instance.entity();
         let id = components.valid_component_id::<T>().unwrap();
 
         while self.filter_yield(&next) && !self.memory.is_empty() {
@@ -781,14 +816,21 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
                 };
                 debug!("{instance:?}: {:?} (#{index}) -> Interrupt", previous);
                 previous.invoke_stop(&self.current, commands.instance(instance));
-                commands.trigger_targets(
-                    OnStop {
-                        index: BehaviorIndex(index),
-                        behavior: previous,
-                        interrupt: true,
-                    },
-                    (*instance, id),
-                );
+
+                commands.queue(move |world: &mut World| {
+                    let components = [id];
+                    world.trigger_with(
+                        Stop {
+                            entity,
+                            index: BehaviorIndex(index),
+                            behavior: previous,
+                            interrupt: true,
+                        },
+                        EntityComponentsTrigger {
+                            components: &components,
+                        },
+                    );
+                });
             }
         }
 
@@ -801,8 +843,10 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
         components: &Components,
         commands: &mut Commands,
     ) -> bool {
-        let id = components.valid_component_id::<T>().unwrap();
+        let entity = instance.entity();
         let index = self.memory.len();
+        let id = components.valid_component_id::<T>().unwrap();
+
         if let Some(mut next) = self.memory.pop() {
             let next_index = self.memory.len();
             debug!(
@@ -815,34 +859,61 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
             };
             self.invoke_resume(&previous, commands.instance(instance));
             previous.invoke_stop(&self.current, commands.instance(instance));
-            commands.trigger_targets(
-                OnStop {
-                    index: BehaviorIndex(index),
-                    behavior: previous,
-                    interrupt: false,
-                },
-                (*instance, id),
-            );
-            commands.trigger_targets(
-                OnResume {
-                    index: BehaviorIndex(next_index),
-                },
-                (*instance, id),
-            );
-            commands.trigger_targets(
-                OnActivate {
-                    index: BehaviorIndex(next_index),
-                    resume: true,
-                },
-                (*instance, id),
-            );
+
+            commands.queue(move |world: &mut World| {
+                let components = [id];
+
+                world.trigger_with(
+                    Stop {
+                        entity,
+                        index: BehaviorIndex(index),
+                        behavior: previous,
+                        interrupt: false,
+                    },
+                    EntityComponentsTrigger {
+                        components: &components,
+                    },
+                );
+                world.trigger_with(
+                    Resume {
+                        entity,
+                        index: BehaviorIndex(next_index),
+                    },
+                    EntityComponentsTrigger {
+                        components: &components,
+                    },
+                );
+                world.trigger_with(
+                    Activate {
+                        entity,
+                        index: BehaviorIndex(next_index),
+                        resume: true,
+                    },
+                    EntityComponentsTrigger {
+                        components: &components,
+                    },
+                );
+            });
             true
         } else {
             warn!(
                 "{instance:?}: transition {:?} -> None is not allowed",
                 *self.current
             );
-            commands.trigger_targets(OnError::<T>(TransitionError::NoPrevious), (*instance, id));
+
+            commands.queue(move |world: &mut World| {
+                let components = [id];
+                world.trigger_with(
+                    Error {
+                        entity,
+                        error: TransitionError::<T>::NoPrevious,
+                    },
+                    EntityComponentsTrigger {
+                        components: &components,
+                    },
+                );
+            });
+
             false
         }
     }
@@ -854,6 +925,7 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
         components: &Components,
         commands: &mut Commands,
     ) {
+        let entity = instance.entity();
         let id = components.valid_component_id::<T>().unwrap();
 
         // Stop all states except the one above the given index
@@ -863,14 +935,21 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
             let next = self.memory.last().unwrap();
             debug!("{instance:?}: {:?} (#{index}) -> Interrupt", previous);
             previous.invoke_stop(next, commands.instance(instance));
-            commands.trigger_targets(
-                OnStop {
-                    index: BehaviorIndex(index),
-                    behavior: previous,
-                    interrupt: true,
-                },
-                (*instance, id),
-            );
+
+            commands.queue(move |world: &mut World| {
+                let components = [id];
+                world.trigger_with(
+                    Stop {
+                        entity,
+                        index: BehaviorIndex(index),
+                        behavior: previous,
+                        interrupt: true,
+                    },
+                    EntityComponentsTrigger {
+                        components: &components,
+                    },
+                );
+            });
         }
 
         // Pop the state above the given index
@@ -878,7 +957,7 @@ impl<T: Behavior> BehaviorMutItem<'_, T> {
     }
 }
 
-impl<T: Behavior> Deref for BehaviorMutItem<'_, T> {
+impl<T: Behavior> Deref for BehaviorMutItem<'_, '_, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -886,13 +965,13 @@ impl<T: Behavior> Deref for BehaviorMutItem<'_, T> {
     }
 }
 
-impl<T: Behavior> DerefMut for BehaviorMutItem<'_, T> {
+impl<T: Behavior> DerefMut for BehaviorMutItem<'_, '_, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.current_mut()
     }
 }
 
-impl<T: Behavior> DetectChanges for BehaviorMutItem<'_, T> {
+impl<T: Behavior> DetectChanges for BehaviorMutItem<'_, '_, T> {
     fn is_added(&self) -> bool {
         self.current.is_added()
     }
@@ -914,7 +993,7 @@ impl<T: Behavior> DetectChanges for BehaviorMutItem<'_, T> {
     }
 }
 
-impl<T: Behavior> DetectChangesMut for BehaviorMutItem<'_, T> {
+impl<T: Behavior> DetectChangesMut for BehaviorMutItem<'_, '_, T> {
     type Inner = T;
 
     fn set_changed(&mut self) {
@@ -938,19 +1017,19 @@ impl<T: Behavior> DetectChangesMut for BehaviorMutItem<'_, T> {
     }
 }
 
-impl<T: Behavior> AsRef<T> for BehaviorMutItem<'_, T> {
+impl<T: Behavior> AsRef<T> for BehaviorMutItem<'_, '_, T> {
     fn as_ref(&self) -> &T {
         self.current.as_ref()
     }
 }
 
-impl<T: Behavior> AsMut<T> for BehaviorMutItem<'_, T> {
+impl<T: Behavior> AsMut<T> for BehaviorMutItem<'_, '_, T> {
     fn as_mut(&mut self) -> &mut T {
         self.current.as_mut()
     }
 }
 
-impl<T: Behavior> Index<BehaviorIndex> for BehaviorMutItem<'_, T> {
+impl<T: Behavior> Index<BehaviorIndex> for BehaviorMutItem<'_, '_, T> {
     type Output = T;
 
     fn index(&self, BehaviorIndex(index): BehaviorIndex) -> &Self::Output {
@@ -962,7 +1041,7 @@ impl<T: Behavior> Index<BehaviorIndex> for BehaviorMutItem<'_, T> {
     }
 }
 
-impl<T: Behavior> IndexMut<BehaviorIndex> for BehaviorMutItem<'_, T> {
+impl<T: Behavior> IndexMut<BehaviorIndex> for BehaviorMutItem<'_, '_, T> {
     fn index_mut(&mut self, BehaviorIndex(index): BehaviorIndex) -> &mut Self::Output {
         if index == self.memory.stack.len() {
             self.current_mut()

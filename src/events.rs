@@ -46,36 +46,49 @@
 //! }
 //! ```
 
+use bevy_ecs::event::EntityComponentsTrigger;
 use bevy_ecs::prelude::*;
 
 use crate::transition::TransitionError;
 use crate::{Behavior, BehaviorIndex};
 
 /// An event which is triggered when a [`Behavior`] starts.
-#[derive(Event)]
-pub struct OnStart {
+#[derive(EntityEvent)]
+#[entity_event(trigger = EntityComponentsTrigger<'a>)]
+pub struct Start {
+    /// Target of this [`EntityEvent`].
+    pub entity: Entity,
     /// The index of the behavior that was started.
     pub index: BehaviorIndex,
 }
 
 /// An event which is triggered when a [`Behavior`] is paused.
-#[derive(Event)]
-pub struct OnPause {
+#[derive(EntityEvent)]
+#[entity_event(trigger = EntityComponentsTrigger<'a>)]
+pub struct Pause {
+    /// Target of this [`EntityEvent`].
+    pub entity: Entity,
     /// The index of the behavior that was paused.
     pub index: BehaviorIndex,
 }
 
 /// An event which is triggered when a [`Behavior`] is resumed.
-#[derive(Event)]
-pub struct OnResume {
+#[derive(EntityEvent)]
+#[entity_event(trigger = EntityComponentsTrigger<'a>)]
+pub struct Resume {
+    /// Target of this [`EntityEvent`].
+    pub entity: Entity,
     /// The index of the behavior that was resumed.
     pub index: BehaviorIndex,
 }
 
 /// An event which is triggered when a [`Behavior`] is started OR resumed.
 ///
-#[derive(Event)]
-pub struct OnActivate {
+#[derive(EntityEvent)]
+#[entity_event(trigger = EntityComponentsTrigger<'a>)]
+pub struct Activate {
+    /// Target of this [`EntityEvent`].
+    pub entity: Entity,
     /// The index of the behavior that was activated.
     pub index: BehaviorIndex,
     /// Whether the behavior was resumed or started.
@@ -87,8 +100,11 @@ pub struct OnActivate {
 /// An event which is triggered when a [`Behavior`] is stopped.
 ///
 /// Unlike other events, this one does not provide a behavior index.
-#[derive(Event)]
-pub struct OnStop<T: Behavior> {
+#[derive(EntityEvent)]
+#[entity_event(trigger = EntityComponentsTrigger<'a>)]
+pub struct Stop<T: Behavior> {
+    /// Target of this [`EntityEvent`].
+    pub entity: Entity,
     /// The index of the behavior that was stopped.
     pub index: BehaviorIndex,
     /// The behavior that was stopped.
@@ -98,5 +114,11 @@ pub struct OnStop<T: Behavior> {
 }
 
 /// An event which is triggered when a [`TransitionError`] occurs.
-#[derive(Event)]
-pub struct OnError<T: Behavior>(pub TransitionError<T>);
+#[derive(EntityEvent)]
+#[entity_event(trigger = EntityComponentsTrigger<'a>)]
+pub struct Error<T: Behavior> {
+    /// Target of this [`EntityEvent`].
+    pub entity: Entity,
+    /// The associated [`TransitionError`].
+    pub error: TransitionError<T>,
+}

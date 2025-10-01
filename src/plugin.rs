@@ -21,13 +21,11 @@ use crate::{Behavior, Memory, Transition, TransitionQueue};
 ///
 /// impl Behavior for B {}
 ///
-/// fn main() {
-///     App::new()
-///         /* ... */
-///         .add_plugins(BehaviorPlugin::<B>::default())
-///         .add_systems(Update, transition::<B>)
-///         /* ... */;
-/// }
+/// App::new()
+///     .add_plugins(BehaviorPlugin::<B>::default())
+///     .add_systems(Update, transition::<B>);
+///
+/// // ...
 /// ```
 pub struct BehaviorPlugin<T: Behavior>(PhantomData<T>);
 

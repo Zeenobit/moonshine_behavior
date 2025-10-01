@@ -193,11 +193,11 @@ To do this, use [`remove_with_require::<T>()`](https://docs.rs/bevy/latest/bevy/
 When a transition is invoked, several behavior [`events`] are triggered.
 You may use the following triggers to react to these events:
 
-- [`Trigger<OnStart, T>`] - Triggered when a new behavior starts.
-- [`Trigger<OnPause, T>`] - Triggered when a behavior is paused as the next one starts.
-- [`Trigger<OnResume, T>`] - Triggered when a behavior is resumed as the previous one stops.
-- [`Trigger<OnStop<T>, T>`] - Triggered when a behavior stops (⚠️ Note the additional type parameter).
-- [`Trigger<OnActivate, T>`] - Triggered when a behavior is activated (started OR resumed).
+- [`On<Start, T>`] - Triggered when a new behavior starts.
+- [`On<Pause, T>`] - Triggered when a behavior is paused as the next one starts.
+- [`On<Resume, T>`] - Triggered when a behavior is resumed as the previous one stops.
+- [`On<Stop<T>, T>`] - Triggered when a behavior stops (⚠️ Note the additional type parameter).
+- [`On<Activate, T>`] - Triggered when a behavior is activated (started OR resumed).
 
 See [`events`] documentation for more details.
 
@@ -224,16 +224,6 @@ These hook commands would be executed immediately after [`transition`] is invoke
 
 See [signal.rs](examples/signal.rs) for a complete example.
 
-### Version 0.3
-
-- Add `try_*` functions to `BehaviorMut<T>` to automatically check for transition overrides
-- Refactor `BehaviorEvents` into separate events to work better with new Bevy triggers
-    - An `OnActivate` event is also added
-- Add `BehaviorIndex` for safer behavior index management
-- Add `interrupt_stop` and `interrupt_resume` transition methods
-    - The old "Reset" transition is implemented as an `interrupt_resume` to initial behavior
-
-
 ## Support
 
 Please [post an issue](https://github.com/Zeenobit/moonshine_behavior/issues/new) for any bugs, questions, or suggestions.
@@ -251,11 +241,11 @@ You may also contact me on the official [Bevy Discord](https://discord.gg/bevy) 
 [`TransitionSequence`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/struct.TransitionSequence.html
 [`BehaviorEvent`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/struct.BehaviorEvent.html
 [`events`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/events/index.html
-[`Trigger<OnStart, T>`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/events/struct.OnStart.html
-[`Trigger<OnStop<T>, T>`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/events/struct.OnStop.html
-[`Trigger<OnPause, T>`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/events/struct.OnReset.html
-[`Trigger<OnResume, T>`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/events/struct.OnResume.html
-[`Trigger<OnActivate, T>`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/events/struct.OnActivate.html
+[`On<Start, T>`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/events/struct.Start.html
+[`On<Stop<T>, T>`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/events/struct.Stop.html
+[`On<Pause, T>`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/events/struct.Reset.html
+[`On<Resume, T>`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/events/struct.Resume.html
+[`On<Activate, T>`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/events/struct.Activate.html
 [`BehaviorRef<T>`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/struct.BehaviorRef.html
 [`BehaviorMut<T>`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/struct.BehaviorMut.html
 [`start`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/struct.BehaviorMutItem.html#method.start

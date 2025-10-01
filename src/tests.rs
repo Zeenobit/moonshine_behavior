@@ -1,6 +1,8 @@
+#![allow(clippy::type_complexity)]
+
 use bevy::{ecs::system::RunSystemOnce, prelude::*};
 
-use crate::events::OnError;
+use crate::events::Error;
 use crate::prelude::*;
 
 use self::T::*;
@@ -125,11 +127,11 @@ fn push_error() {
     let e = app.world_mut().spawn((A, Next(C))).id();
 
     app.add_observer(
-        move |trigger: Trigger<OnError<T>, T>,
+        move |trigger: On<Error<T>, T>,
               q: Single<BehaviorRef<T>, (With<TA>, Without<TC>)>,
               mut commands: Commands| {
             assert_eq!(**q, A);
-            assert_eq!(trigger.target(), e);
+            assert_eq!(trigger.entity, e);
             commands.insert_resource(ErrorTriggered);
         },
     );
@@ -165,11 +167,11 @@ fn pop_initial() {
     let e = app.world_mut().spawn((A, Previous::<T>)).id();
 
     app.add_observer(
-        move |trigger: Trigger<OnError<T>, T>,
+        move |trigger: On<Error<T>, T>,
               q: Single<BehaviorRef<T>, With<TA>>,
               mut commands: Commands| {
             assert_eq!(**q, A);
-            assert_eq!(trigger.target(), e);
+            assert_eq!(trigger.entity, e);
             commands.insert_resource(ErrorTriggered);
         },
     );
@@ -604,11 +606,11 @@ fn interrupt_error() {
         .unwrap();
 
     app.add_observer(
-        move |trigger: Trigger<OnError<T>, T>,
+        move |trigger: On<Error<T>, T>,
               q: Single<BehaviorRef<T>, With<TA>>,
               mut commands: Commands| {
             assert_eq!(**q, B);
-            assert_eq!(trigger.target(), e);
+            assert_eq!(trigger.entity, e);
             commands.insert_resource(ErrorTriggered);
         },
     );
