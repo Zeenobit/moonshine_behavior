@@ -16,31 +16,31 @@
 //!
 //! impl Behavior for B {}
 //!
-//! fn on_start(trigger: Trigger<OnStart, B>, query: Query<BehaviorRef<B>>) {
+//! fn on_start(trigger: On<Start, B>, query: Query<BehaviorRef<B>>) {
 //!     let behavior = query.get(trigger.target()).unwrap();
 //!     let state = &behavior[trigger.index];
 //!     /* ... */
 //! }
 //!
-//! fn on_pause(trigger: Trigger<OnPause, B>, query: Query<BehaviorRef<B>>) {
+//! fn on_pause(trigger: On<Pause, B>, query: Query<BehaviorRef<B>>) {
 //!     let behavior = query.get(trigger.target()).unwrap();
 //!     let state = &behavior[trigger.index];
 //!     /* ... */
 //! }
 //!
-//! fn on_resume(trigger: Trigger<OnResume, B>, query: Query<BehaviorRef<B>>) {
+//! fn on_resume(trigger: On<Resume, B>, query: Query<BehaviorRef<B>>) {
 //!     let behavior = query.get(trigger.target()).unwrap();
 //!     let state = &behavior[trigger.index];
 //!     /* ... */
 //! }
 //!
-//! fn on_activate(trigger: Trigger<OnActivate, B>, query: Query<BehaviorRef<B>>) {
+//! fn on_activate(trigger: On<Activate, B>, query: Query<BehaviorRef<B>>) {
 //!     let behavior = query.get(trigger.target()).unwrap();
 //!     let state = &behavior[trigger.index];
 //!     /* ... */
 //! }
 //!
-//! fn on_stop(trigger: Trigger<OnStop<B>, B>) {
+//! fn on_stop(trigger: On<Stop<B>, B>) {
 //!     let state = &trigger.behavior;
 //!     /* ... */
 //! }
