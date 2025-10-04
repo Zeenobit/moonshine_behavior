@@ -59,7 +59,7 @@
 //!     /* ... */
 //! }
 //!
-//! fn on_stop(event: OnStop<B>, B>) {
+//! fn on_stop(event: OnStop<B>) {
 //!     let state = &event.behavior;
 //!     /* ... */
 //! }

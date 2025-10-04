@@ -241,11 +241,11 @@ You may also contact me on the official [Bevy Discord](https://discord.gg/bevy) 
 [`TransitionSequence`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/struct.TransitionSequence.html
 [`BehaviorEvent`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/struct.BehaviorEvent.html
 [`events`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/events/index.html
-[`On<Start<T>>`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/events/struct.Start.html
-[`On<Stop<T>>`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/events/struct.Stop.html
-[`On<Pause<T>>`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/events/struct.Reset.html
-[`On<Resume<T>>`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/events/struct.Resume.html
-[`On<Activate, T>`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/events/struct.Activate.html
+[`OnStart<T>`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/events/struct.Start.html
+[`OnStop<T>`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/events/struct.Stop.html
+[`OnPause<T>`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/events/struct.Reset.html
+[`OnResume<T>`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/events/struct.Resume.html
+[`OnActivate<T>`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/events/struct.Activate.html
 [`BehaviorRef<T>`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/struct.BehaviorRef.html
 [`BehaviorMut<T>`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/struct.BehaviorMut.html
 [`start`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/struct.BehaviorMutItem.html#method.start
