@@ -208,7 +208,6 @@ pub struct BehaviorRef<T: Behavior> {
     current: Ref<'static, T>,
     memory: &'static Memory<T>,
     transition: &'static Transition<T>,
-    sequence: Has<TransitionQueue<T>>,
 }
 
 impl<T: Behavior> BehaviorRef<T> {
@@ -218,7 +217,6 @@ impl<T: Behavior> BehaviorRef<T> {
             current: entity.get_ref::<T>()?,
             memory: entity.get::<Memory<T>>()?,
             transition: entity.get::<Transition<T>>()?,
-            sequence: entity.contains::<TransitionQueue<T>>(),
         })
     }
 }
