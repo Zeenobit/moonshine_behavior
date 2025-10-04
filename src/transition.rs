@@ -67,21 +67,37 @@ pub fn transition<T: Behavior>(
         let entity = instance.entity();
 
         if behavior.is_added() {
-            // TODO: This is weird. A better solution is needed.
-            // Without this, the initial behavior never gets started.
-            // With this, on load, only the initial behavior gets the start event.
-            // In theory, this should trigger Start (and Pause) for every single state in the stack.
-            // But that violates the "1 transition per frame" rule and it can cause a lot of unstability.
+            let mut stack: VecDeque<T> = behavior
+                .memory
+                .bypass_change_detection()
+                .drain(..)
+                .collect();
+
+            if !stack.is_empty() {
+                let mut initial = stack.pop_front().unwrap();
+                let current = {
+                    std::mem::swap(behavior.current.as_mut(), &mut initial);
+                    initial
+                };
+
+                stack.push_back(current);
+            }
+
             behavior.invoke_start(None, commands.instance(instance));
             commands.queue(move |world: &mut World| {
                 world.trigger_with(
                     Start {
                         instance,
                         index: BehaviorIndex::initial(),
+                        initial: true,
                     },
                     EntityTrigger,
                 );
             });
+
+            for state in stack {
+                let _ = behavior.push(instance, state, true, &mut commands);
+            }
         }
 
         // Index of the stopped behavior, if applicable.
@@ -91,7 +107,7 @@ pub fn transition<T: Behavior>(
 
         match behavior.transition.take() {
             Next(next) => {
-                interrupt_queue = !behavior.push(instance, next, &mut commands);
+                interrupt_queue = !behavior.push(instance, next, false, &mut commands);
             }
             Previous => {
                 stop_index = Some(behavior.current_index());
@@ -161,15 +177,6 @@ pub struct TransitionQueue<T: Behavior> {
 }
 
 impl<T: Behavior> TransitionQueue<T> {
-    /// Creates a new transition sequence which starts all the given behaviors in given order.
-    #[deprecated(since = "0.3.1", note = "use `TransitionQueue::chain` instead")]
-    pub fn new(items: impl IntoIterator<Item = T>) -> Self {
-        Self {
-            queue: VecDeque::from_iter(items.into_iter().map(TransitionQueueItem::Start)),
-            wait_for: None,
-        }
-    }
-
     /// Creates a new [`TransitionQueue`] which starts each given behavior in order.
     ///
     /// Unlike [`TransitionQueue::sequence`], a chain does not wait for the behaviors to stop

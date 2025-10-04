@@ -1,9 +1,23 @@
 //! Each [`Behavior`] [`Transition`](crate::transition::Transition) triggers an [`Event`].
 //!
 //! You may use these events to react to transitions and define the behavior logic.
-//! Most events contain a [`BehaviorIndex`] which may be used to query the current state of the behavior.
 //!
-//! See documentation for each event for more details.
+//! ## Behavior Indices
+//!
+//! Most events contain a [`BehaviorIndex`] which may be used to identify the exact state associated with the event.
+//! You may use [`Index`](std::ops::Index) operator to access the associated state.
+//!
+//! ## Initialization
+//!
+//! On spawn, several [`Behavior`] states may be activated at the same time. This can happen if the entity is reloaded from
+//! disk or synchronized from the network, for example.
+//!
+//! For technical reasons, you may need to perform different logic in such cases.
+//!
+//! For example, considering the following scenario:
+//! Let's imagine we're trying to model a car. When the car starts, we want to play an engine start audio clip.
+//! However, if the car has been turned on, and is now being loaded from disk, we should skip the engine start audio clip.
+//! You may use the `.initial` flag on the behavior events to branch your logic.
 //!
 //! # Example
 //! ```rust
@@ -16,35 +30,42 @@
 //!
 //! impl Behavior for B {}
 //!
-//! fn on_start(trigger: OnStart<B>, query: Query<BehaviorRef<B>>) {
-//!     let behavior = query.get(trigger.target()).unwrap();
-//!     let state = &behavior[trigger.index];
+//! fn on_start(event: OnStart<B>, query: Query<BehaviorRef<B>>) {
+//!     let behavior = query.get(*event.instance).unwrap();
+//!     let state = &behavior[event.index];
+//!
+//!     if event.initial {
+//!         /* Custom initialization logic */
+//!     }
+//!
 //!     /* ... */
 //! }
 //!
-//! fn on_pause(trigger: OnPause<B>, query: Query<BehaviorRef<B>>) {
-//!     let behavior = query.get(trigger.target()).unwrap();
-//!     let state = &behavior[trigger.index];
+//! fn on_pause(event: OnPause<B>, query: Query<BehaviorRef<B>>) {
+//!     let behavior = query.get(*event.instance).unwrap();
+//!     let state = &behavior[event.index];
 //!     /* ... */
 //! }
 //!
-//! fn on_resume(trigger: OnResume<B>, query: Query<BehaviorRef<B>>) {
-//!     let behavior = query.get(trigger.target()).unwrap();
-//!     let state = &behavior[trigger.index];
+//! fn on_resume(event: OnResume<B>, query: Query<BehaviorRef<B>>) {
+//!     let behavior = query.get(*event.instance).unwrap();
+//!     let state = &behavior[event.index];
 //!     /* ... */
 //! }
 //!
-//! fn on_activate(trigger: OnActivate<B>, query: Query<BehaviorRef<B>>) {
-//!     let behavior = query.get(trigger.target()).unwrap();
-//!     let state = &behavior[trigger.index];
+//! fn on_activate(event: OnActivate<B>, query: Query<BehaviorRef<B>>) {
+//!     let behavior = query.get(*event.instance).unwrap();
+//!     let state = &behavior[event.index];
 //!     /* ... */
 //! }
 //!
-//! fn on_stop(trigger: OnStop<B>, B>) {
-//!     let state = &trigger.behavior;
+//! fn on_stop(event: OnStop<B>, B>) {
+//!     let state = &event.behavior;
 //!     /* ... */
 //! }
 //! ```
+//!
+//! ##
 
 use bevy_ecs::event::EntityTrigger;
 use bevy_ecs::prelude::*;
@@ -63,6 +84,8 @@ pub struct Start<T: Behavior> {
     pub instance: Instance<T>,
     /// The index of the behavior that was started.
     pub index: BehaviorIndex,
+    /// If true, it implies the behavior is initializing. See [module documention](self) for details.
+    pub initial: bool,
 }
 
 impl_entity_event_from_instance!(Start<T> where T: Behavior);
@@ -107,6 +130,8 @@ pub struct Activate<T: Behavior> {
     pub index: BehaviorIndex,
     /// Whether the behavior was resumed or started.
     pub resume: bool,
+    /// If true, it implies the behavior is initializing. See [module documention](self) for details.
+    pub initial: bool,
 }
 
 impl_entity_event_from_instance!(Activate<T> where T: Behavior);

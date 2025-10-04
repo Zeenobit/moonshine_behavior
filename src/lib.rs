@@ -672,7 +672,13 @@ impl<T: Behavior> BehaviorMutItem<'_, '_, T> {
         }
     }
 
-    fn push(&mut self, instance: Instance<T>, mut next: T, commands: &mut Commands) -> bool {
+    fn push(
+        &mut self,
+        instance: Instance<T>,
+        mut next: T,
+        initial: bool,
+        commands: &mut Commands,
+    ) -> bool {
         if self.filter_next(&next) {
             let previous = {
                 swap(self.current.as_mut(), &mut next);
@@ -701,6 +707,7 @@ impl<T: Behavior> BehaviorMutItem<'_, '_, T> {
                         Start {
                             instance,
                             index: BehaviorIndex(next_index),
+                            initial,
                         },
                         EntityTrigger,
                     );
@@ -709,6 +716,7 @@ impl<T: Behavior> BehaviorMutItem<'_, '_, T> {
                             instance,
                             index: BehaviorIndex(next_index),
                             resume: false,
+                            initial,
                         },
                         EntityTrigger,
                     );
@@ -737,6 +745,7 @@ impl<T: Behavior> BehaviorMutItem<'_, '_, T> {
                         Start {
                             instance,
                             index: BehaviorIndex(index),
+                            initial,
                         },
                         EntityTrigger,
                     );
@@ -745,6 +754,7 @@ impl<T: Behavior> BehaviorMutItem<'_, '_, T> {
                             instance,
                             index: BehaviorIndex(index),
                             resume: false,
+                            initial,
                         },
                         EntityTrigger,
                     );
@@ -796,7 +806,7 @@ impl<T: Behavior> BehaviorMutItem<'_, '_, T> {
             }
         }
 
-        self.push(instance, next, commands);
+        self.push(instance, next, false, commands);
     }
 
     fn pop(&mut self, instance: Instance<T>, commands: &mut Commands) -> bool {
@@ -837,6 +847,7 @@ impl<T: Behavior> BehaviorMutItem<'_, '_, T> {
                         instance,
                         index: BehaviorIndex(next_index),
                         resume: true,
+                        initial: false,
                     },
                     EntityTrigger,
                 );

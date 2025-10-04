@@ -99,13 +99,12 @@ fn initial_load() {
     ));
     app.update();
 
-    // Behavior system does NOT trigger hooks on load
-    // Saved state should save all persistent components
-    // TODO: This is kinda awkward. Why does the initial behavior support this, but others don't?
-    assert!(app
-        .world_mut()
-        .run_system_once(|q: Single<BehaviorRef<T>, (With<TA>, With<TB>, With<TC>)>| { **q })
-        .is_err());
+    assert_eq!(
+        app.world_mut()
+            .run_system_once(|q: Single<BehaviorRef<T>, (With<TA>, With<TB>, With<TC>)>| { **q })
+            .unwrap(),
+        C
+    );
 }
 
 #[test]
