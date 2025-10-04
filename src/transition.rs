@@ -5,8 +5,7 @@
 use std::collections::VecDeque;
 use std::fmt::Debug;
 
-use bevy_ecs::component::Components;
-use bevy_ecs::event::EntityComponentsTrigger;
+use bevy_ecs::event::EntityTrigger;
 use bevy_ecs::prelude::*;
 use bevy_log::prelude::*;
 use bevy_reflect::prelude::*;
@@ -58,7 +57,6 @@ impl<T: Behavior> Default for Transition<T> {
 /// A system which processes [`Behavior`] [`Transitions`](Transition).
 #[allow(clippy::type_complexity)]
 pub fn transition<T: Behavior>(
-    components: &Components,
     mut query: Query<
         (Instance<T>, BehaviorMut<T>, Option<&mut TransitionQueue<T>>),
         Or<(Changed<Transition<T>>, With<TransitionQueue<T>>)>,
@@ -67,20 +65,21 @@ pub fn transition<T: Behavior>(
 ) {
     for (instance, mut behavior, queue_opt) in &mut query {
         let entity = instance.entity();
-        let component_id = components.valid_component_id::<T>().unwrap();
-        let components = [component_id];
 
         if behavior.is_added() {
+            // TODO: This is weird. A better solution is needed.
+            // Without this, the initial behavior never gets started.
+            // With this, on load, only the initial behavior gets the start event.
+            // In theory, this should trigger Start (and Pause) for every single state in the stack.
+            // But that violates the "1 transition per frame" rule and it can cause a lot of unstability.
             behavior.invoke_start(None, commands.instance(instance));
             commands.queue(move |world: &mut World| {
                 world.trigger_with(
                     Start {
-                        entity,
+                        instance,
                         index: BehaviorIndex::initial(),
                     },
-                    EntityComponentsTrigger {
-                        components: &components,
-                    },
+                    EntityTrigger,
                 );
             });
         }
@@ -92,18 +91,18 @@ pub fn transition<T: Behavior>(
 
         match behavior.transition.take() {
             Next(next) => {
-                interrupt_queue = !behavior.push(instance, next, component_id, &mut commands);
+                interrupt_queue = !behavior.push(instance, next, &mut commands);
             }
             Previous => {
                 stop_index = Some(behavior.current_index());
-                interrupt_queue = !behavior.pop(instance, component_id, &mut commands);
+                interrupt_queue = !behavior.pop(instance, &mut commands);
             }
             Interrupt(Interruption::Start(next)) => {
-                behavior.interrupt(instance, next, component_id, &mut commands);
+                behavior.interrupt(instance, next, &mut commands);
                 interrupt_queue = true;
             }
             Interrupt(Interruption::Resume(index)) => {
-                behavior.clear(instance, index, component_id, &mut commands);
+                behavior.clear(instance, index, &mut commands);
                 interrupt_queue = true;
             }
             _ => {}

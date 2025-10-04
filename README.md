@@ -193,11 +193,11 @@ To do this, use [`remove_with_require::<T>()`](https://docs.rs/bevy/latest/bevy/
 When a transition is invoked, several behavior [`events`] are triggered.
 You may use the following triggers to react to these events:
 
-- [`On<Start, T>`] - Triggered when a new behavior starts.
-- [`On<Pause, T>`] - Triggered when a behavior is paused as the next one starts.
-- [`On<Resume, T>`] - Triggered when a behavior is resumed as the previous one stops.
-- [`On<Stop<T>, T>`] - Triggered when a behavior stops (⚠️ Note the additional type parameter).
-- [`On<Activate, T>`] - Triggered when a behavior is activated (started OR resumed).
+- [`OnStart<T>`] - Triggered when a new behavior starts.
+- [`OnPause<T>`] - Triggered when a behavior is paused as the next one starts.
+- [`OnResume<T>`] - Triggered when a behavior is resumed as the previous one stops.
+- [`OnActivate<T>`] - Triggered when a behavior is activated (started OR resumed).
+- [`OnStop<T>`] - Triggered when a behavior stops.
 
 See [`events`] documentation for more details.
 
@@ -241,10 +241,10 @@ You may also contact me on the official [Bevy Discord](https://discord.gg/bevy) 
 [`TransitionSequence`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/struct.TransitionSequence.html
 [`BehaviorEvent`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/struct.BehaviorEvent.html
 [`events`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/events/index.html
-[`On<Start, T>`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/events/struct.Start.html
-[`On<Stop<T>, T>`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/events/struct.Stop.html
-[`On<Pause, T>`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/events/struct.Reset.html
-[`On<Resume, T>`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/events/struct.Resume.html
+[`On<Start<T>>`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/events/struct.Start.html
+[`On<Stop<T>>`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/events/struct.Stop.html
+[`On<Pause<T>>`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/events/struct.Reset.html
+[`On<Resume<T>>`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/events/struct.Resume.html
 [`On<Activate, T>`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/events/struct.Activate.html
 [`BehaviorRef<T>`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/struct.BehaviorRef.html
 [`BehaviorMut<T>`]:https://docs.rs/moonshine-behavior/latest/moonshine_behavior/struct.BehaviorMut.html

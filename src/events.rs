@@ -16,95 +16,113 @@
 //!
 //! impl Behavior for B {}
 //!
-//! fn on_start(trigger: On<Start, B>, query: Query<BehaviorRef<B>>) {
+//! fn on_start(trigger: OnStart<B>, query: Query<BehaviorRef<B>>) {
 //!     let behavior = query.get(trigger.target()).unwrap();
 //!     let state = &behavior[trigger.index];
 //!     /* ... */
 //! }
 //!
-//! fn on_pause(trigger: On<Pause, B>, query: Query<BehaviorRef<B>>) {
+//! fn on_pause(trigger: OnPause<B>, query: Query<BehaviorRef<B>>) {
 //!     let behavior = query.get(trigger.target()).unwrap();
 //!     let state = &behavior[trigger.index];
 //!     /* ... */
 //! }
 //!
-//! fn on_resume(trigger: On<Resume, B>, query: Query<BehaviorRef<B>>) {
+//! fn on_resume(trigger: OnResume<B>, query: Query<BehaviorRef<B>>) {
 //!     let behavior = query.get(trigger.target()).unwrap();
 //!     let state = &behavior[trigger.index];
 //!     /* ... */
 //! }
 //!
-//! fn on_activate(trigger: On<Activate, B>, query: Query<BehaviorRef<B>>) {
+//! fn on_activate(trigger: OnActivate<B>, query: Query<BehaviorRef<B>>) {
 //!     let behavior = query.get(trigger.target()).unwrap();
 //!     let state = &behavior[trigger.index];
 //!     /* ... */
 //! }
 //!
-//! fn on_stop(trigger: On<Stop<B>, B>) {
+//! fn on_stop(trigger: OnStop<B>, B>) {
 //!     let state = &trigger.behavior;
 //!     /* ... */
 //! }
 //! ```
 
-use bevy_ecs::event::EntityComponentsTrigger;
+use bevy_ecs::event::EntityTrigger;
 use bevy_ecs::prelude::*;
+use moonshine_kind::{impl_entity_event_from_instance, prelude::*};
 
 use crate::transition::TransitionError;
 use crate::{Behavior, BehaviorIndex};
 
 /// An event which is triggered when a [`Behavior`] starts.
-#[derive(EntityEvent)]
-#[entity_event(trigger = EntityComponentsTrigger<'a>)]
-pub struct Start {
+///
+/// See [`OnStart`] for a more ergonomic type alias for use in systems.
+#[derive(Event)]
+#[event(trigger = EntityTrigger)]
+pub struct Start<T: Behavior> {
     /// Target of this [`EntityEvent`].
-    pub entity: Entity,
+    pub instance: Instance<T>,
     /// The index of the behavior that was started.
     pub index: BehaviorIndex,
 }
 
+impl_entity_event_from_instance!(Start<T> where T: Behavior);
+
 /// An event which is triggered when a [`Behavior`] is paused.
-#[derive(EntityEvent)]
-#[entity_event(trigger = EntityComponentsTrigger<'a>)]
-pub struct Pause {
+///
+/// See [`OnPause`] for a more ergonomic type alias for use in systems.
+#[derive(Event)]
+#[event(trigger = EntityTrigger)]
+pub struct Pause<T: Behavior> {
     /// Target of this [`EntityEvent`].
-    pub entity: Entity,
+    pub instance: Instance<T>,
     /// The index of the behavior that was paused.
     pub index: BehaviorIndex,
 }
 
+impl_entity_event_from_instance!(Pause<T> where T: Behavior);
+
 /// An event which is triggered when a [`Behavior`] is resumed.
-#[derive(EntityEvent)]
-#[entity_event(trigger = EntityComponentsTrigger<'a>)]
-pub struct Resume {
+///
+/// See [`OnResume`] for a more ergonomic type alias for use in systems.
+#[derive(Event)]
+#[event(trigger = EntityTrigger)]
+pub struct Resume<T: Behavior> {
     /// Target of this [`EntityEvent`].
-    pub entity: Entity,
+    pub instance: Instance<T>,
     /// The index of the behavior that was resumed.
     pub index: BehaviorIndex,
 }
 
+impl_entity_event_from_instance!(Resume<T> where T: Behavior);
+
 /// An event which is triggered when a [`Behavior`] is started OR resumed.
 ///
-#[derive(EntityEvent)]
-#[entity_event(trigger = EntityComponentsTrigger<'a>)]
-pub struct Activate {
+/// See [`OnActivate`] for a more ergonomic type alias for use in systems.
+#[derive(Event)]
+#[event(trigger = EntityTrigger)]
+pub struct Activate<T: Behavior> {
     /// Target of this [`EntityEvent`].
-    pub entity: Entity,
+    pub instance: Instance<T>,
     /// The index of the behavior that was activated.
     pub index: BehaviorIndex,
     /// Whether the behavior was resumed or started.
     pub resume: bool,
 }
 
+impl_entity_event_from_instance!(Activate<T> where T: Behavior);
+
 // TODO: OnSuspend, This gets tricky because the behavior state is already gone in `OnStop` ...
 
 /// An event which is triggered when a [`Behavior`] is stopped.
 ///
 /// Unlike other events, this one does not provide a behavior index.
-#[derive(EntityEvent)]
-#[entity_event(trigger = EntityComponentsTrigger<'a>)]
+///
+/// See [`OnStop`] for a more ergonomic type alias for use in systems.
+#[derive(Event)]
+#[event(trigger = EntityTrigger)]
 pub struct Stop<T: Behavior> {
     /// Target of this [`EntityEvent`].
-    pub entity: Entity,
+    pub instance: Instance<T>,
     /// The index of the behavior that was stopped.
     pub index: BehaviorIndex,
     /// The behavior that was stopped.
@@ -113,12 +131,36 @@ pub struct Stop<T: Behavior> {
     pub interrupt: bool,
 }
 
+impl_entity_event_from_instance!(Stop<T> where T: Behavior);
+
 /// An event which is triggered when a [`TransitionError`] occurs.
-#[derive(EntityEvent)]
-#[entity_event(trigger = EntityComponentsTrigger<'a>)]
+///
+/// See [`OnError`] for a more ergonomic type alias for use in systems.
+#[derive(Event)]
+#[event(trigger = EntityTrigger)]
 pub struct Error<T: Behavior> {
     /// Target of this [`EntityEvent`].
-    pub entity: Entity,
+    pub instance: Instance<T>,
     /// The associated [`TransitionError`].
     pub error: TransitionError<T>,
 }
+
+impl_entity_event_from_instance!(Error<T> where T: Behavior);
+
+/// Alias for [`On<Start<T>>`](`Start`)
+pub type OnStart<'w, 't, T> = On<'w, 't, Start<T>>;
+
+/// Alias for [`On<Pause<T>>`](`Pause`)
+pub type OnPause<'w, 't, T> = On<'w, 't, Pause<T>>;
+
+/// Alias for [`On<Resume<T>>`](`Resume`)
+pub type OnResume<'w, 't, T> = On<'w, 't, Resume<T>>;
+
+/// Alias for [`On<Activate<T>>`](`Activate`)
+pub type OnActivate<'w, 't, T> = On<'w, 't, Activate<T>>;
+
+/// Alias for [`On<Stop<T>>`](`Stop`)
+pub type OnStop<'w, 't, T> = On<'w, 't, Stop<T>>;
+
+/// Alias for [`On<Error<T>>`](`Error`)
+pub type OnError<'w, 't, T> = On<'w, 't, Error<T>>;
