@@ -5,11 +5,7 @@ use moonshine_behavior::prelude::*;
 
 fn main() {
     App::new()
-        .add_plugins((
-            DefaultPlugins,
-            BehaviorPlugin::<Signal>::default(),
-            //Shape2dPlugin::default(),
-        ))
+        .add_plugins((DefaultPlugins, BehaviorPlugin::<Signal>::default()))
         .add_systems(Startup, (setup, spawn_lights))
         .add_systems(
             Update,
