@@ -11,6 +11,11 @@ fn main() {
             Update,
             (update_signal, transition::<Signal>, update_lights).chain(),
         )
+        .add_observer(signal_start)
+        .add_observer(signal_pause)
+        .add_observer(signal_resume)
+        .add_observer(signal_activate)
+        .add_observer(signal_stop)
         .run();
 }
 
@@ -142,4 +147,47 @@ fn update_lights(
             draw_circle(*red, OFF_COLOR);
         }
     }
+}
+
+fn signal_start(event: OnStart<Signal>, query: Query<BehaviorRef<Signal>>) {
+    let entity = event.instance.entity();
+    let Ok(behavior) = query.get(entity) else {
+        return;
+    };
+
+    info!("{} Started: {:?}", event.instance, &behavior[event.index]);
+}
+
+fn signal_pause(event: OnPause<Signal>, query: Query<BehaviorRef<Signal>>) {
+    let entity = event.instance.entity();
+    let Ok(behavior) = query.get(entity) else {
+        return;
+    };
+
+    info!("{} Paused: {:?}", event.instance, &behavior[event.index]);
+}
+
+fn signal_resume(event: OnResume<Signal>, query: Query<BehaviorRef<Signal>>) {
+    let entity = event.instance.entity();
+    let Ok(behavior) = query.get(entity) else {
+        return;
+    };
+
+    info!("{} Resumed: {:?}", event.instance, &behavior[event.index]);
+}
+
+fn signal_activate(event: OnActivate<Signal>, query: Query<BehaviorRef<Signal>>) {
+    let entity = event.instance.entity();
+    let Ok(behavior) = query.get(entity) else {
+        return;
+    };
+
+    info!(
+        "{} Activated (Resume = {}): {:?}",
+        event.instance, event.resume, &behavior[event.index]
+    );
+}
+
+fn signal_stop(event: OnStop<Signal>) {
+    info!("{} Stopped: {:?}", event.instance, event.behavior);
 }
