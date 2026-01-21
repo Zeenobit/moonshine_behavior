@@ -34,8 +34,8 @@ use std::mem::{replace, swap};
 use std::ops::{Deref, DerefMut, Index, IndexMut};
 
 use bevy_derive::{Deref, DerefMut};
-use bevy_ecs::change_detection::MaybeLocation;
-use bevy_ecs::component::{Mutable, Tick};
+use bevy_ecs::change_detection::{MaybeLocation, Tick};
+use bevy_ecs::component::Mutable;
 use bevy_ecs::event::EntityTrigger;
 use bevy_ecs::{prelude::*, query::QueryData};
 use bevy_log::prelude::*;
