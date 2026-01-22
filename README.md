@@ -1,4 +1,4 @@
-# 🎚️ Moonshine Behavior
+# 🎭 Moonshine Behavior
 
 [![crates.io](https://img.shields.io/crates/v/moonshine-behavior)](https://crates.io/crates/moonshine-behavior)
 [![downloads](https://img.shields.io/crates/dr/moonshine-behavior?label=downloads)](https://crates.io/crates/moonshine-behavior)
