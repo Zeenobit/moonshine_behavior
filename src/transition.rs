@@ -23,11 +23,12 @@ pub use self::Transition::{Interrupt, Next, Previous};
 ///
 /// This component is automatically registered as a required component for all types
 /// which implement the [`Behavior`] trait and and have their [`BehaviorPlugin`](crate::plugin::BehaviorPlugin) added.
-#[derive(Component, Clone, Debug, Reflect)]
+#[derive(Component, Default, Clone, Debug, Reflect)]
 #[require(Expect<T>, Memory<T>)]
 #[reflect(Component)]
 pub enum Transition<T: Behavior> {
     #[doc(hidden)]
+    #[default]
     None,
     /// Starts the next behavior.
     Next(T),
@@ -45,12 +46,6 @@ impl<T: Behavior> Transition<T> {
 
     fn take(&mut self) -> Self {
         std::mem::replace(self, Transition::None)
-    }
-}
-
-impl<T: Behavior> Default for Transition<T> {
-    fn default() -> Self {
-        Self::None
     }
 }
 
