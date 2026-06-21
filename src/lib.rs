@@ -291,6 +291,14 @@ impl<T: Behavior> DetectChanges for BehaviorRefItem<'_, '_, T> {
     fn changed_by(&self) -> MaybeLocation {
         self.current.changed_by()
     }
+
+    fn is_added_after(&self, other: Tick) -> bool {
+        self.current.is_added_after(other)
+    }
+
+    fn is_changed_after(&self, other: Tick) -> bool {
+        self.current.is_changed_after(other)
+    }
 }
 
 impl<T: Behavior> Index<BehaviorIndex> for BehaviorRefItem<'_, '_, T> {
@@ -389,6 +397,14 @@ impl<T: Behavior> DetectChanges for BehaviorMutReadOnlyItem<'_, '_, T> {
 
     fn changed_by(&self) -> MaybeLocation {
         self.current.changed_by()
+    }
+
+    fn is_added_after(&self, other: Tick) -> bool {
+        self.current.is_added_after(other)
+    }
+
+    fn is_changed_after(&self, other: Tick) -> bool {
+        self.current.is_changed_after(other)
     }
 }
 
@@ -931,6 +947,14 @@ impl<T: Behavior> DetectChanges for BehaviorMutItem<'_, '_, T> {
 
     fn changed_by(&self) -> MaybeLocation {
         self.current.changed_by()
+    }
+
+    fn is_added_after(&self, other: Tick) -> bool {
+        self.current.is_added_after(other)
+    }
+
+    fn is_changed_after(&self, other: Tick) -> bool {
+        self.current.is_changed_after(other)
     }
 }
 
