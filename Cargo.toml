@@ -1,6 +1,6 @@
 [package]
 name = "moonshine-behavior"
-version = "0.5.0"
+version = "0.6.0"
 edition = "2021"
 license = "MIT"
 description = "Minimalistic state machine for Bevy game engine."
@@ -8,13 +8,13 @@ homepage = "https://github.com/Zeenobit/moonshine_behavior"
 repository = "https://github.com/Zeenobit/moonshine_behavior"
 
 [dependencies]
-bevy_app = "0.19"
-bevy_ecs = "0.19"
-bevy_reflect = "0.19"
-bevy_log = "0.19"
-bevy_derive = "0.19"
-moonshine-kind = { version = "0.5" }
-moonshine-util = { version = "0.5" }
+bevy_app = "0.20"
+bevy_ecs = "0.20"
+bevy_reflect = "0.20"
+bevy_log = "0.20"
+bevy_derive = "0.20"
+moonshine-kind = { version = "0.6" }
+moonshine-util = { version = "0.6" }
 
 [dev-dependencies]
-bevy = "0.19"
+bevy = "0.20"

@@ -299,6 +299,14 @@ impl<T: Behavior> DetectChanges for BehaviorRefItem<'_, '_, T> {
     fn is_changed_after(&self, other: Tick) -> bool {
         self.current.is_changed_after(other)
     }
+
+    fn this_run(&self) -> Tick {
+        self.current.this_run()
+    }
+
+    fn last_run(&self) -> Tick {
+        self.current.last_run()
+    }
 }
 
 impl<T: Behavior> Index<BehaviorIndex> for BehaviorRefItem<'_, '_, T> {
@@ -405,6 +413,14 @@ impl<T: Behavior> DetectChanges for BehaviorMutReadOnlyItem<'_, '_, T> {
 
     fn is_changed_after(&self, other: Tick) -> bool {
         self.current.is_changed_after(other)
+    }
+
+    fn this_run(&self) -> Tick {
+        self.current.this_run()
+    }
+
+    fn last_run(&self) -> Tick {
+        self.current.last_run()
     }
 }
 
@@ -955,6 +971,14 @@ impl<T: Behavior> DetectChanges for BehaviorMutItem<'_, '_, T> {
 
     fn is_changed_after(&self, other: Tick) -> bool {
         self.current.is_changed_after(other)
+    }
+
+    fn this_run(&self) -> Tick {
+        self.current.this_run()
+    }
+
+    fn last_run(&self) -> Tick {
+        self.current.last_run()
     }
 }
 
