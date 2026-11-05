@@ -14,14 +14,16 @@ pub mod prelude {
 
     pub use crate::events::{OnActivate, OnPause, OnResume, OnStart, OnStop};
     pub use crate::plugin::BehaviorPlugin;
+    pub use crate::state::BehaviorState;
 
-    pub use crate::match_next;
+    pub use crate::{impl_behavior_state, match_next};
 
     #[allow(deprecated)]
     pub use crate::transition::TransitionSequence;
 }
 
 pub mod events;
+pub mod state;
 pub mod transition;
 
 mod plugin;
@@ -473,9 +475,9 @@ impl<T: Behavior> BehaviorItem for BehaviorMutItem<'_, '_, T> {
 }
 
 impl<T: Behavior> BehaviorMutItem<'_, '_, T> {
-    /// Returns the current [`Behavior`] state as a mutable.
-    pub fn current_mut(&mut self) -> &mut T {
-        self.current.as_mut()
+    /// Returns the current [`Behavior`] state as a [`Mut`].
+    pub fn current_mut(&mut self) -> Mut<'_, T> {
+        self.current.reborrow()
     }
 
     /// Returns the previous [`Behavior`] state as a mutable.
@@ -940,7 +942,7 @@ impl<T: Behavior> Deref for BehaviorMutItem<'_, '_, T> {
 
 impl<T: Behavior> DerefMut for BehaviorMutItem<'_, '_, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        self.current_mut()
+        &mut self.current
     }
 }
 
@@ -1033,7 +1035,7 @@ impl<T: Behavior> Index<BehaviorIndex> for BehaviorMutItem<'_, '_, T> {
 impl<T: Behavior> IndexMut<BehaviorIndex> for BehaviorMutItem<'_, '_, T> {
     fn index_mut(&mut self, BehaviorIndex(index): BehaviorIndex) -> &mut Self::Output {
         if index == self.memory.stack.len() {
-            self.current_mut()
+            &mut self.current
         } else {
             &mut self.memory[index]
         }
