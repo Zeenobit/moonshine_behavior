@@ -1,3 +1,5 @@
+#![allow(clippy::type_complexity)] // Complex Bevy queries are complex
+
 use std::time::Duration;
 
 use bevy::prelude::*;
@@ -176,6 +178,9 @@ fn start_sleep<T: BehaviorState<Sleep>>(
     };
 
     info!("{}: Sleeping for {duration:?}", event.instance);
+
+    // Instead of using Timers, prefer to record the start time
+    // This prevents redundant mutations of the behavior component
     commands.entity(entity).insert(SleepStart(time.elapsed()));
 }
 
@@ -185,7 +190,8 @@ fn sleep<T: BehaviorState<Sleep>>(time: Res<Time>, query: Query<(BehaviorMut<T>,
             continue;
         };
 
-        if time.elapsed() - *start >= *duration {
+        let elapsed = time.elapsed() - *start;
+        if elapsed >= *duration {
             behavior.stop();
         }
     }
